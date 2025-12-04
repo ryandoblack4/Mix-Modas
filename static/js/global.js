@@ -1,10 +1,10 @@
-// Gerenciamento global de estado de login e carrinho
 function atualizarEstadoLogin() {
     const usuarioLogado = localStorage.getItem('usuarioLogado');
     const loginLink = document.getElementById('loginLink');
     
     if (loginLink && usuarioLogado) {
-        loginLink.innerHTML = `👤 Sair (${usuarioLogado})`;
+        const nomeUsuario = localStorage.getItem('nomeUsuario') || usuarioLogado.split('@')[0];
+        loginLink.innerHTML = `👤 ${nomeUsuario}`;
         loginLink.href = "#";
         loginLink.onclick = function(e) {
             e.preventDefault();
@@ -21,6 +21,11 @@ function fazerLogout() {
     localStorage.removeItem('usuarioLogado');
     localStorage.removeItem('userRole');
     localStorage.removeItem('nomeUsuario');
+    localStorage.removeItem('userUID');
+    localStorage.removeItem('firebaseToken');
+    
+    // Atualizar estado imediatamente
+    atualizarEstadoLogin();
     window.location.href = '/templates/index.html';
 }
 
@@ -37,9 +42,32 @@ function atualizarFavoritosVisual() {
     if (link) link.textContent = `❤️ Lista de Desejos (${fav.length})`;
 }
 
-// Inicializar em todas as páginas
+// Adicionar menu admin se for admin
+function adicionarMenuAdmin() {
+    const userRole = localStorage.getItem('userRole');
+    const iconsDiv = document.querySelector('.icons');
+    
+    if (userRole === 'admin' && iconsDiv && !document.getElementById('adminLink')) {
+        const adminLink = document.createElement('a');
+        adminLink.id = 'adminLink';
+        adminLink.href = '/templates/lista_produtos.html';
+        adminLink.innerHTML = '👑 Admin';
+        adminLink.style.color = '#ff6600';
+        adminLink.style.fontWeight = 'bold';
+        adminLink.style.marginRight = '15px';
+        iconsDiv.insertBefore(adminLink, iconsDiv.firstChild);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     atualizarEstadoLogin();
     atualizarCarrinhoVisual();
     atualizarFavoritosVisual();
+    adicionarMenuAdmin();
 });
+
+// Exportar funções para uso global
+window.atualizarEstadoLogin = atualizarEstadoLogin;
+window.fazerLogout = fazerLogout;
+window.atualizarCarrinhoVisual = atualizarCarrinhoVisual;
+window.atualizarFavoritosVisual = atualizarFavoritosVisual;

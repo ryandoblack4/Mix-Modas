@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
     } catch (err) {
-      console.error('❌ Erro ao carregar produtos:', err);
+      console.error('Erro ao carregar produtos:', err);
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:red;">Erro ao carregar produtos.</td></tr>';
     }
   }

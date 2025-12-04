@@ -34,7 +34,7 @@
     </nav>
 
     <div class="promo-bar">
-        🚀 Frete grátis para compras acima de <span>R$99,99</span> 
+        Frete grátis para compras acima de <span>R$99,99</span> 
     </div>
 
     <div class="breadcrumb">
@@ -173,3 +173,15 @@
         <div id="produtos-grid" class="produtos-grid"></div>
     </section>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

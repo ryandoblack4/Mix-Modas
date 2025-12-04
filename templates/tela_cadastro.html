@@ -18,6 +18,13 @@
             max-width: 180px;
             height: auto;
         }
+        
+        .loading {
+            display: none;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -29,13 +36,8 @@
         <h1>Crie sua conta</h1>
         
         <div>
-            <label for="firstName">Nome</label>
-            <input type="text" id="firstName" name="firstName" placeholder="Seu nome" required>
-        </div>
-        
-        <div>
-            <label for="lastName">Sobrenome</label>
-            <input type="text" id="lastName" name="lastName" placeholder="Seu sobrenome" required>
+            <label for="nome">Nome Completo</label>
+            <input type="text" id="nome" name="nome" placeholder="Seu nome completo" required>
         </div>
         
         <div>
@@ -57,12 +59,12 @@
             <input type="checkbox" id="terms" name="terms" required style="width: 18px; height: 18px; margin-top: 2px;">
             <label for="terms" style="font-size: 0.85rem; color: #555; line-height: 1.4;">
                 Eu concordo com os <a href="#" target="_blank" style="color: #d6005d; text-decoration: none; font-weight: 600;">Termos de Uso</a> e 
-                <a href="#" target="_blank" style="color: #d6005d; text-decoration: none; font-weight: 600;">Política de Privacidade</a> da Mix-Modas. 
-                Aceito receber comunicações e ofertas especiais.
+                <a href="#" target="_blank" style="color: #d6005d; text-decoration: none; font-weight: 600;">Política de Privacidade</a> da Mix-Modas.
             </label>
         </div>
         
         <button type="submit" class="login-button">Criar Conta</button>
+        <div id="loading" class="loading">Processando...</div>
         
         <div class="links-container">
             <a href="/templates/tela_login.html" class="text-link">Já tem uma conta? Entre aqui</a>
@@ -74,69 +76,91 @@
     </form>
 
     <script>
-        document.getElementById('cadastroForm').addEventListener('submit', function(e) {
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('cadastroForm');
+        const mensagem = document.getElementById('mensagem');
+        const loading = document.getElementById('loading');
+        
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
+            const nome = document.getElementById('nome').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const confirmPassword = document.getElementById('confirmPassword').value.trim();
             const terms = document.getElementById('terms').checked;
-            const mensagem = document.getElementById('mensagem');
 
             mensagem.style.color = '#d6005d';
             mensagem.textContent = '';
-            mensagem.style.background = 'transparent';
+            loading.style.display = 'block';
+            form.querySelector('.login-button').disabled = true;
 
-            if (!firstName) {
+            if (!nome) {
                 mensagem.textContent = 'Por favor, insira seu nome';
-                return;
-            }
-
-            if (!lastName) {
-                mensagem.textContent = 'Por favor, insira seu sobrenome';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
                 return;
             }
 
             if (!email || !email.includes('@')) {
                 mensagem.textContent = 'Por favor, insira um e-mail válido';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
                 return;
             }
 
             if (!password || password.length < 6) {
                 mensagem.textContent = 'A senha deve ter pelo menos 6 caracteres';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
                 return;
             }
 
             if (password !== confirmPassword) {
                 mensagem.textContent = 'As senhas não coincidem';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
                 return;
             }
 
             if (!terms) {
                 mensagem.textContent = 'Você deve aceitar os termos de uso para continuar';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
                 return;
             }
 
-            const userData = {
-                firstName,
-                lastName,
-                email,
-                password,
-                termsAccepted: true
-            };
-            
-            localStorage.setItem('user_' + email, JSON.stringify(userData));
-            
-            mensagem.style.color = '#27ae60';
-            mensagem.style.background = '#f0fff4';
-            mensagem.textContent = 'Conta criada com sucesso! Redirecionando...';
-            
-            setTimeout(() => {
-                window.location.href = '/templates/tela_login.html';
-            }, 2000);
+            try {
+                const res = await fetch('/api/cadastro', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, email, senha: password })
+                });
+                
+                const data = await res.json();
+
+                if (!res.ok) {
+                    mensagem.textContent = data.error || 'Erro ao cadastrar.';
+                    loading.style.display = 'none';
+                    form.querySelector('.login-button').disabled = false;
+                    return;
+                }
+
+                mensagem.style.color = '#27ae60';
+                mensagem.textContent = 'Conta criada com sucesso! Redirecionando para login...';
+                
+                setTimeout(() => {
+                    window.location.href = '/templates/tela_login.html';
+                }, 2000);
+
+            } catch (err) {
+                console.error('Erro:', err);
+                mensagem.textContent = 'Erro de conexão. Tente novamente.';
+                loading.style.display = 'none';
+                form.querySelector('.login-button').disabled = false;
+            }
         });
+    });
     </script>
 </body>
 </html>

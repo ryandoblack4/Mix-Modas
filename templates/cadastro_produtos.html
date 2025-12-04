@@ -68,7 +68,6 @@
       </select>
     </div>
 
-    <!-- Campos dinâmicos para Acessórios -->
     <div id="camposAcessorios" class="campos-dinamicos hidden">
       <h3>Informações do Acessório</h3>
       
@@ -101,7 +100,6 @@
       </div>
     </div>
 
-    <!-- Campos dinâmicos para Infantil -->
     <div id="camposInfantil" class="campos-dinamicos hidden">
       <h3>Informações Infantil</h3>
       
@@ -127,7 +125,6 @@
       </div>
     </div>
 
-    <!-- Campos para Roupas (Masculino/Feminino) -->
     <div id="camposRoupas" class="campos-dinamicos hidden">
       <h3>Informações da Roupa</h3>
       
@@ -211,3 +208,16 @@
 </script>
 
 <script src="/static/js/cadastro_produtos.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
+
+</body>
+</html> 

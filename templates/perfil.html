@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Perfil - Mix-Modas</title>
+    <link rel="stylesheet" href="/static/css/style_login.css">
+    <style>
+        .perfil-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .perfil-info {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .perfil-info p {
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .perfil-acoes {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .perfil-acoes button {
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-editar { background: #007bff; color: white; }
+        .btn-senha { background: #28a745; color: white; }
+        .btn-verificar { background: #17a2b8; color: white; }
+        .btn-pedidos { background: #ffc107; color: black; }
+        .btn-sair { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="perfil-container">
+        <h1>👤 Meu Perfil</h1>
+        
+        <div id="perfilInfo" class="perfil-info">
+            <p><strong>Nome:</strong> <span id="userName">Carregando...</span></p>
+            <p><strong>Email:</strong> <span id="userEmail">Carregando...</span></p>
+            <p><strong>Status:</strong> <span id="userStatus">Carregando...</span></p>
+            <p><strong>Tipo:</strong> <span id="userRole">Carregando...</span></p>
+        </div>
+        
+        <div class="perfil-acoes">
+            <button onclick="window.location.href='/templates/editar_perfil.html'" class="btn-editar">✏️ Editar Perfil</button>
+            <button onclick="window.location.href='/templates/alterar_senha.html'" class="btn-senha">🔐 Alterar Senha</button>
+            <button onclick="logoutFirebase()" class="btn-sair">🚪 Sair</button>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="/templates/index.html">← Voltar para a Loja</a>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <script src="/static/js/firebase-auth.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAhtHCacGDIR_49DMmVxBWuqLRocwSgRDk",
+            authDomain: "sistema-de-loja-85c8a.firebaseapp.com",
+            databaseURL: "https://sistema-de-loja-85c8a-default-rtdb.firebaseio.com",
+            projectId: "sistema-de-loja-85c8a",
+            storageBucket: "sistema-de-loja-85c8a.firebasestorage.app",
+            messagingSenderId: "514984327740",
+            appId: "1:514984327740:web:f63757577a32d0fa8da139"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+            
+            verificarUsuarioLogado().then(({ loggedIn, user }) => {
+                if (!loggedIn) {
+                    alert("Você precisa fazer login para acessar esta página.");
+                    window.location.href = '/templates/tela_login.html';
+                    return;
+                }
+                
+                document.getElementById('userName').textContent = user.displayName || 'Não definido';
+                document.getElementById('userEmail').textContent = user.email;
+                document.getElementById('userStatus').textContent = user.emailVerified ? '✅ Verificado' : '❌ Não verificado';
+                document.getElementById('userStatus').style.color = user.emailVerified ? 'green' : 'red';
+                
+                if (typeof isAdmin === 'function') {
+                    document.getElementById('userRole').textContent = isAdmin() ? '👑 Administrador' : '👤 Usuário';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

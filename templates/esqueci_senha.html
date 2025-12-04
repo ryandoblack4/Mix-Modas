@@ -97,5 +97,16 @@
     }
   });
   </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
+
 </body>
 </html>

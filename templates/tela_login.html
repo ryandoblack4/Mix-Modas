@@ -17,6 +17,12 @@
       max-width: 180px;
       height: auto;
     }
+    .loading {
+      display: none;
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -38,68 +44,84 @@
     </div>
 
     <button type="submit" class="login-button">Entrar</button>
+    
+    <div id="loading" class="loading">Processando...</div>
 
     <div class="links-container">
       <a href="/templates/tela_cadastro.html" class="text-link">Criar conta</a>
       <span style="margin: 0 10px; color: #ddd;">|</span>
       <a href="/templates/esqueci_senha.html" class="text-link">Esqueci minha senha</a>
       <br>
-      <a href="#" id="voltarLoja" class="voltar-link">← Voltar para a loja</a>
+      <a href="/templates/index.html" class="voltar-link">← Voltar para a loja</a>
     </div>
 
     <div id="mensagem"></div>
   </form>
 
 <script>
-document.getElementById('loginForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const email = document.getElementById('email').value.trim();
-  const senha = document.getElementById('password').value.trim();
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('loginForm');
   const mensagem = document.getElementById('mensagem');
+  const loading = document.getElementById('loading');
+  
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('password').value.trim();
 
-  mensagem.style.color = '#d6005d';
-  mensagem.textContent = '';
+    mensagem.style.color = '#d6005d';
+    mensagem.textContent = '';
+    loading.style.display = 'block';
+    form.querySelector('.login-button').disabled = true;
 
-  if (!email || !senha) {
-    mensagem.textContent = 'Preencha e-mail e senha.';
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, senha })
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      mensagem.textContent = data.error || 'Falha no login.';
+    if (!email || !senha) {
+      mensagem.textContent = 'Preencha e-mail e senha.';
+      loading.style.display = 'none';
+      form.querySelector('.login-button').disabled = false;
       return;
     }
 
-    localStorage.setItem('usuarioLogado', data.email);
-    localStorage.setItem('userRole', data.role);
-    localStorage.setItem('nomeUsuario', data.nome);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha })
+      });
+      
+      const data = await res.json();
 
-    mensagem.style.color = '#27ae60';
-    mensagem.textContent = 'Login realizado! Redirecionando...';
+      if (!res.ok) {
+        mensagem.textContent = data.error || 'Falha no login.';
+        loading.style.display = 'none';
+        form.querySelector('.login-button').disabled = false;
+        return;
+      }
 
-    setTimeout(() => {
-      if (data.role === 'admin') window.location.href = '/templates/lista_produtos.html';
-      else window.location.href = '/templates/index.html';
-    }, 1000);
+      localStorage.setItem('usuarioLogado', data.email);
+      localStorage.setItem('userRole', data.role);
+      localStorage.setItem('nomeUsuario', data.nome);
+      localStorage.setItem('userUID', data.uid);
+      localStorage.setItem('firebaseToken', data.token);
 
-  } catch (err) {
-    mensagem.textContent = 'Erro no servidor. Tente novamente.';
-    console.error(err);
-  }
-});
+      mensagem.style.color = '#27ae60';
+      mensagem.textContent = 'Login realizado com sucesso!';
+      
+      setTimeout(() => {
+        if (data.role === 'admin') {
+          window.location.href = '/templates/lista_produtos.html';
+        } else {
+          window.location.href = '/templates/index.html';
+        }
+      }, 1000);
 
-document.getElementById('voltarLoja').addEventListener('click', function(e){
-  e.preventDefault();
-  localStorage.removeItem('userRole');
-  window.location.href = '/templates/index.html';
+    } catch (err) {
+      console.error('Erro:', err);
+      mensagem.textContent = 'Erro de conexão. Tente novamente.';
+      loading.style.display = 'none';
+      form.querySelector('.login-button').disabled = false;
+    }
+  });
 });
 </script>
 </body>

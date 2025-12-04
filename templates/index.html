@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mix-Modas</title>
   <link rel="stylesheet" href="/static/css/style_index.css">
+   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <script src="/static/js/firebase-auth.js"></script>
 </head>
 <body>
-
-  <!-- Botão para abrir a barra lateral -->
   <button class="categories-toggle" onclick="toggleSidebar()">☰ Todas as Categorias</button>
 
-  <!-- Barra lateral de categorias -->
   <div class="categories-sidebar" id="categoriesSidebar">
     <h3>🛍️ Categorias</h3>
     <ul class="categories-list">
@@ -23,7 +24,6 @@
     </ul>
   </div>
 
-  <!-- Overlay para fechar a barra lateral -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <header>
@@ -55,7 +55,7 @@
   </nav>
 
   <div class="promo-bar">
-    🚀 Frete grátis para compras acima de <span>R$99,99</span>
+    Frete grátis para compras acima de <span>R$99,99</span>
   </div>
 
   <section class="banner">
@@ -77,7 +77,6 @@
   <section class="destaques">
     <h2>⭐ Destaques da Semana</h2>
     <div id="produtos-grid" class="produtos-grid">
-      <!-- Produtos serão carregados aqui -->
     </div>
   </section>
 
@@ -107,7 +106,6 @@
 
   <script src="/static/js/global.js"></script>
   <script>
-    // Funções para controlar a barra lateral
     function toggleSidebar() {
       const sidebar = document.getElementById('categoriesSidebar');
       const overlay = document.getElementById('sidebarOverlay');
@@ -121,8 +119,6 @@
       sidebar.classList.remove('active');
       overlay.classList.remove('active');
     }
-
-    // Função para adicionar produtos ao carrinho
     function adicionarAoCarrinho(produto) {
       let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
       const produtoExistente = carrinho.find(p => p.id === produto.id);
@@ -149,31 +145,24 @@
         alert(`Pesquisando por: ${termo}`);
       }
     }
-
-    // Carregar produtos na página inicial
     document.addEventListener("DOMContentLoaded", () => {
       const container = document.getElementById("produtos-grid");
-
-      // Fechar sidebar ao clicar em links
       document.querySelectorAll('.categories-list a').forEach(link => {
         link.addEventListener('click', closeSidebar);
       });
 
-      // Fechar sidebar ao pressionar ESC
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
           closeSidebar();
         }
       });
 
-      // Event listener para pesquisa
       document.getElementById('searchInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
           pesquisar();
         }
       });
 
-      // Simulação de produtos
       const produtosDestaque = [
         { 
           id: 1, 
@@ -205,7 +194,6 @@
         }
       ];
 
-      // Se a API não responder, usar produtos simulados
       fetch('/api/produtos')
         .then(res => res.json())
         .then(produtos => {
@@ -235,12 +223,40 @@
   `).join('');
 }
 
-// nova função
 function verDetalhes(id) {
   localStorage.setItem('produtoSelecionado', id);
   window.location.href = '/templates/detalhes_produto.html';
 }
     });
   </script>
+ <script>
+        const firebaseConfig = {
+           apiKey: "AIzaSyAhtHCacGDIR_49DMmVxBWuqLRocwSgRDk",
+           authDomain: "sistema-de-loja-85c8a.firebaseapp.com",
+           databaseURL: "https://sistema-de-loja-85c8a-default-rtdb.firebaseio.com",
+           projectId: "sistema-de-loja-85c8a",
+           storageBucket: "sistema-de-loja-85c8a.firebasestorage.app",
+           messagingSenderId: "514984327740",
+           appId: "1:514984327740:web:f63757577a32d0fa8da139"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
+        
+        console.log("🔥 Firebase inicializado no frontend!");
+   </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
+
 </body>
 </html>

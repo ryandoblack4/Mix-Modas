@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const camposAcessorios = document.getElementById('camposAcessorios');
   const camposInfantil = document.getElementById('camposInfantil');
 
-  // Mostra campos conforme categoria
   function atualizarCamposDinamicos(categoria) {
     camposRoupas.classList.add('hidden');
     camposAcessorios.classList.add('hidden');
@@ -29,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const idToEdit = params.get('id');
 
-  // --- Edição: carrega produto existente ---
   if (idToEdit) {
     fetch('/api/produtos')
       .then(r => r.json())
@@ -44,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('preco').value = p.preco;
           document.getElementById('quantidade').value = p.quantidade;
 
-          // Campos específicos
           if (p.categoria === 'masculino' || p.categoria === 'feminino') {
             document.getElementById('tamanhoRoupa').value = p.tamanho || '';
             document.getElementById('corRoupa').value = p.cor || '';
@@ -63,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // --- Envio do formulário ---
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -76,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('preco', parseFloat(document.getElementById('preco').value));
     formData.append('quantidade', parseInt(document.getElementById('quantidade').value));
 
-    // Campos dinâmicos
     if (categoria === 'masculino' || categoria === 'feminino') {
       formData.append('tamanho', document.getElementById('tamanhoRoupa').value);
       formData.append('cor', document.getElementById('corRoupa').value);

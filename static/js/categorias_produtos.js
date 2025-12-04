@@ -1,13 +1,7 @@
-// categorias_produtos.js (completo, compatível com seu HTML/CSS e backend)
-// Busca produtos por categoria no backend (/api/produtos?categoria=...) e usa arrays de exemplo como fallback.
-// Mantém filtros, ordenação, pesquisa, carrinho e favoritos.
-
 (function () {
-  // utilidades
   function placeholder() { return '/static/img/sem-foto.png'; }
   function safeLower(s){ return (s || '').toString().toLowerCase(); }
 
-  // --- Estado / elementos ---
   const grids = Array.from(document.querySelectorAll('[id$="-grid"], .produtos-grid'));
   const idadeSelect = document.getElementById('idadeSelect');
   const generoSelect = document.getElementById('generoSelect');
@@ -17,7 +11,6 @@
   const ordenarSelect = document.getElementById('ordenarSelect');
   const searchInput = document.getElementById('searchInput');
 
-  // Carrinho / favoritos visuais
   function atualizarCarrinhoVisual() {
     const carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
     const total = carrinho.reduce((t, p) => t + (p.quantidade || 0), 0);
@@ -30,7 +23,6 @@
     if (link) link.textContent = `❤️ Lista de Desejos (${fav.length})`;
   }
 
-  // Adicionar ao carrinho / favoritos
   function adicionarAoCarrinho(prod) {
     let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
     const idx = carrinho.findIndex(p => String(p.id) === String(prod.id));
@@ -53,8 +45,6 @@
       alert(`${prod.nome} já está nos favoritos.`);
     }
   }
-
-  // --- Produtos de exemplo (fallback) ---
   const produtosMasculinos = [
     { id: 1, nome: "Camisa Polo", preco: 99.9, tamanho: "M", cor: "Azul", categoria: "masculino", imagem: "https://www.lojamirante.com.br/uploads/produtos/camisa-polo-pa-azul-royal-617cb70f9d839.jpg" },
     { id: 2, nome: "Camiseta", preco: 49.9, tamanho: "G", cor: "Branco", categoria: "masculino", imagem: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop" },
@@ -79,7 +69,6 @@
     { id: 20, nome: "Óculos de Sol", preco: 79.9, tipo: "Óculos", cor: "Preto", categoria: "acessorios", imagem: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=300&h=300&fit=crop" }
   ];
 
-  // --- Função principal: carrega produtos por grid (usa dataset.categoria) ---
   async function carregarGrid(gridEl) {
     try {
       const categoria = (gridEl.dataset.categoria || '').toString().trim();
@@ -87,7 +76,6 @@
 
       let list = [];
 
-      // Tenta buscar produtos reais do backend (com filtro por categoria quando existe)
       try {
         const url = categoria ? `/api/produtos?categoria=${encodeURIComponent(categoria)}` : '/api/produtos';
         const res = await fetch(url);
@@ -105,7 +93,6 @@
         list = [];
       }
 
-      // Se backend não trouxe nada, usar fallback (produtos estáticos)
       if (!list || list.length === 0) {
         const catLower = safeLower(categoria);
         if (catLower === 'masculino') list = produtosMasculinos.slice();
@@ -113,15 +100,12 @@
         else if (catLower === 'infantil') list = produtosInfantis.slice();
         else if (catLower === 'acessorios') list = produtosAcessorios.slice();
         else {
-          // se nenhuma categoria específica, tenta buscar tudo do backend (novamente) ou junta todos os exemplos
           if (list.length === 0) {
-            // já tentou backend; monte lista com todos os exemplos
             list = [].concat(produtosMasculinos, produtosFemininos, produtosInfantis, produtosAcessorios);
           }
         }
       }
 
-      // lê filtros UI (se aplicáveis)
       let idadeFilter = 'Todas', generoFilter = 'Todos', tamanhoFilter = 'Todos', corFilter = 'Todas', tipoFilter = 'Todos';
       if (safeLower(categoria) === 'infantil') {
         idadeFilter = document.getElementById('idadeSelect')?.value || 'Todas';
@@ -135,15 +119,11 @@
       }
       const ordenar = document.getElementById('ordenarSelect')?.value || 'Mais vendidos';
 
-      // Aplica pesquisa (campo global)
       const termoSearch = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
 
-      // Filtra lista
       let produtos = list.filter(p => {
-        // categoria check: se grid perguntou por categoria, filtramos por ela.
         const passaCategoria = categoria ? safeLower(p.categoria || '') === safeLower(categoria) : true;
 
-        // pesquisa por termo (se existir)
         const passaSearch = !termoSearch || (p.nome && p.nome.toString().toLowerCase().includes(termoSearch)) || (p.descricao && p.descricao.toString().toLowerCase().includes(termoSearch));
 
         let passaFiltros = true;
@@ -160,13 +140,11 @@
 
       console.log('Produtos após filtro:', produtos.map(x => x.nome).slice(0, 10));
 
-      // Ordena
       if (ordenar === 'Menor preço') produtos.sort((a, b) => (a.preco || 0) - (b.preco || 0));
       else if (ordenar === 'Maior preço') produtos.sort((a, b) => (b.preco || 0) - (a.preco || 0));
       else if (ordenar === 'Mais vendidos') produtos.sort((a, b) => (a.id || 0) - (b.id || 0));
       else if (ordenar === 'Lançamentos') produtos.sort((a, b) => (b.id || 0) - (a.id || 0));
 
-      // Render
       gridEl.innerHTML = '';
       if (!produtos || produtos.length === 0) {
         gridEl.innerHTML = '<p>Nenhum produto encontrado com esses filtros.</p>';
@@ -199,8 +177,6 @@
             </div>
           </div>
         `;
-
-        // listeners
         const btnCarrinho = card.querySelector('.btn-carrinho');
         if (btnCarrinho) btnCarrinho.addEventListener('click', () => adicionarAoCarrinho(p));
         const btnFav = card.querySelector('.btn-favorito');
@@ -209,7 +185,6 @@
         gridEl.appendChild(card);
       });
 
-      // atualiza UI global
       atualizarCarrinhoVisual();
       atualizarFavoritosVisual();
 
@@ -219,14 +194,11 @@
     }
   }
 
-  // Inicializa todas as grades (cada uma pode ter dataset.categoria)
   grids.forEach(g => {
     if (g && g.classList && g.classList.contains('produtos-grid')) {
       carregarGrid(g);
     }
   });
-
-  // Recarrega grades quando selects mudam
   [idadeSelect, generoSelect, tamanhoSelect, corSelect, tipoSelect, ordenarSelect].forEach(sel => {
     if (sel) {
       sel.addEventListener('change', () => {
@@ -235,7 +207,6 @@
     }
   });
 
-  // Busca global (enter)
   if (searchInput) {
     searchInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
@@ -245,7 +216,6 @@
     });
   }
 
-  // caso queira forçar refresh externo
   window.refreshCategoriaGrids = function() {
     grids.forEach(g => { if (g && g.classList && g.classList.contains('produtos-grid')) carregarGrid(g); });
   };

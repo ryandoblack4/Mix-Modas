@@ -6,60 +6,496 @@
   <title>Lista Produtos</title>
   <link rel="stylesheet" href="/static/css/style_lista_produtos.css">
   <link rel="stylesheet" href="/static/css/admin.css">
+  <style>
+    /* Estilos adicionais para melhorar a visualização */
+    .imgcell img {
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    
+    .cat {
+      font-size: 12px;
+      color: #666;
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    
+    .namecell {
+      font-weight: 600;
+    }
+    
+    .pricecell {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    
+    .qtdcell {
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .btn.small {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+    
+    .btn.danger {
+      background-color: #e74c3c;
+      color: white;
+    }
+    
+    .btn.danger:hover {
+      background-color: #c0392b;
+    }
+    
+    .btn.edit {
+      background-color: #3498db;
+      color: white;
+    }
+    
+    .btn.edit:hover {
+      background-color: #2980b9;
+    }
+    
+    .produtos-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .produtos-table th {
+      background-color: #f8f9fa;
+      padding: 12px;
+      text-align: left;
+      border-bottom: 2px solid #dee2e6;
+      font-weight: 600;
+      color: #495057;
+    }
+    
+    .produtos-table td {
+      padding: 12px;
+      border-bottom: 1px solid #dee2e6;
+      vertical-align: middle;
+    }
+    
+    .produtos-table tr:hover {
+      background-color: #f8f9fa;
+    }
+  </style>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="title">Lista de Produtos</div>
+  <div class="title">📋 Lista de Produtos</div>
   <div class="actions">
-    <input id="busca" placeholder="Buscar produtos..." aria-label="Buscar produtos">
-    <button id="btnAtualizar" class="btn primary">Atualizar lista</button>
-    <a class="btn secondary" href="/templates/cadastro_produtos.html">+ Cadastrar Produto</a>
+    <input id="busca" type="text" placeholder="Buscar produtos por nome..." aria-label="Buscar produtos">
+    <button id="btnAtualizar" class="btn primary">🔄 Atualizar</button>
+    <a class="btn secondary" href="/templates/cadastro_produtos.html">➕ Novo Produto</a>
   </div>
 </header>
 
 <main class="produtos-area">
+  <div class="filters">
+    <select id="filtroCategoria" class="filter-select">
+      <option value="">Todas as categorias</option>
+      <option value="masculino">Masculino</option>
+      <option value="feminino">Feminino</option>
+      <option value="infantil">Infantil</option>
+      <option value="acessorios">Acessórios</option>
+    </select>
+    
+    <select id="ordenarPor" class="filter-select">
+      <option value="nome">Ordenar por: Nome (A-Z)</option>
+      <option value="preco_asc">Preço: Menor para maior</option>
+      <option value="preco_desc">Preço: Maior para menor</option>
+      <option value="quantidade_desc">Quantidade: Mais em estoque</option>
+      <option value="criado_desc">Mais recentes</option>
+    </select>
+    
+    <div class="stats">
+      <span id="totalProdutos">Carregando...</span>
+    </div>
+  </div>
+  
   <table id="tabela" class="produtos-table">
     <thead>
       <tr>
-        <th>Imagem</th>
-        <th>Nome</th>
+        <th width="100">Imagem</th>
+        <th>Nome / Categoria</th>
         <th>Descrição</th>
-        <th>Preço</th>
-        <th>Qtd</th>
-        <th>Ações</th>
+        <th width="120">Preço</th>
+        <th width="80">Estoque</th>
+        <th width="180">Ações</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="tabelaBody">
+      <tr id="loadingRow">
+        <td colspan="6" style="text-align: center; padding: 40px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+            <div class="spinner"></div>
+            <span>Carregando produtos...</span>
+          </div>
+        </td>
+      </tr>
+    </tbody>
   </table>
+  
+  <div id="noProducts" style="display: none; text-align: center; padding: 40px; color: #666;">
+    <p>Nenhum produto encontrado.</p>
+    <a href="/templates/cadastro_produtos.html" class="btn primary">Cadastrar primeiro produto</a>
+  </div>
 </main>
 
 <aside id="menuLateralAdmin">
   <h3>⚙️ Modo Admin</h3>
-  <a href="/templates/lista_produtos.html">🧾 Lista de Produtos</a>
+  <a href="/templates/lista_produtos.html" class="active">🧾 Lista de Produtos</a>
   <a href="/templates/cadastro_produtos.html">➕ Cadastrar Produto</a>
-  <button id="logoutAdmin">🚪 Sair</button>
+  <a href="/templates/index.html">🏠 Página Inicial</a>
+  <button id="logoutAdmin" class="logout-btn">🚪 Sair</button>
 </aside>
 
 <script>
-  const usuarioLogado = localStorage.getItem('usuarioLogado');
-  const role = localStorage.getItem('userRole');
-  if (!usuarioLogado || role !== 'admin') {
-    alert('Acesso negado! Você precisa estar logado como admin.');
-    window.location.href = '/templates/index.html';
-  } else {
+  // Verificação de autenticação
+  document.addEventListener('DOMContentLoaded', () => {
+    const usuarioLogado = localStorage.getItem('usuarioLogado');
+    const role = localStorage.getItem('userRole');
+    
+    if (!usuarioLogado || role !== 'admin') {
+      alert('Acesso negado! Você precisa estar logado como administrador.');
+      window.location.href = '/templates/tela_login.html';
+      return;
+    }
+    
+    // Mostrar menu lateral
     document.getElementById('menuLateralAdmin').style.display = 'flex';
     document.body.classList.add('menu-ativo');
-  }
-
-  document.getElementById('logoutAdmin').addEventListener('click', () => {
-    localStorage.removeItem('usuarioLogado');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('nomeUsuario');
-    window.location.href = '/templates/tela_login.html';
+    
+    // Exibir nome do usuário no menu
+    const nomeUsuario = localStorage.getItem('nomeUsuario') || 'Admin';
+    const menuTitle = document.querySelector('#menuLateralAdmin h3');
+    menuTitle.innerHTML = `⚙️ ${nomeUsuario}`;
+    
+    // Logout
+    document.getElementById('logoutAdmin').addEventListener('click', () => {
+      if (confirm('Deseja realmente sair?')) {
+        localStorage.removeItem('usuarioLogado');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('nomeUsuario');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userId');
+        window.location.href = '/templates/tela_login.html';
+      }
+    });
+    
+    // Carregar produtos
+    carregarProdutos();
   });
 
- 
+  // Função para carregar produtos do Firestore
+  async function carregarProdutos() {
+    try {
+      const response = await fetch('/api/produtos');
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao carregar produtos: ${response.status}`);
+      }
+      
+      const produtos = await response.json();
+      
+      // Atualizar estatísticas
+      document.getElementById('totalProdutos').textContent = `${produtos.length} produto(s)`;
+      
+      // Limpar tabela
+      const tbody = document.getElementById('tabelaBody');
+      tbody.innerHTML = '';
+      
+      if (produtos.length === 0) {
+        document.getElementById('noProducts').style.display = 'block';
+        return;
+      }
+      
+      document.getElementById('noProducts').style.display = 'none';
+      
+      // Adicionar produtos à tabela
+      produtos.forEach(produto => {
+        const tr = document.createElement('tr');
+        
+        // Formatar categoria
+        let categoriaTexto = produto.categoria || 'Sem categoria';
+        if (categoriaTexto === 'masculino') categoriaTexto = '👔 Masculino';
+        else if (categoriaTexto === 'feminino') categoriaTexto = '👚 Feminino';
+        else if (categoriaTexto === 'infantil') categoriaTexto = '👶 Infantil';
+        else if (categoriaTexto === 'acessorios') categoriaTexto = '👜 Acessórios';
+        
+        // Formatar preço
+        const precoFormatado = produto.preco ? 
+          `R$ ${parseFloat(produto.preco).toFixed(2).replace('.', ',')}` : 
+          'R$ 0,00';
+        
+        // Imagem ou placeholder
+        const imagemSrc = produto.imagem && produto.imagem.trim() !== '' ? 
+          produto.imagem : 
+          '/static/img/sem-foto.png';
+        
+        // Informações adicionais
+        let infoExtra = '';
+        if (produto.tamanho) infoExtra += `Tamanho: ${produto.tamanho}<br>`;
+        if (produto.cor) infoExtra += `Cor: ${produto.cor}<br>`;
+        if (produto.tipo) infoExtra += `Tipo: ${produto.tipo}<br>`;
+        if (produto.idade) infoExtra += `Idade: ${produto.idade}<br>`;
+        if (produto.genero) infoExtra += `Gênero: ${produto.genero}<br>`;
+        
+        tr.innerHTML = `
+          <td class="imgcell">
+            <img src="${imagemSrc}" 
+                 alt="${produto.nome || 'Produto'}" 
+                 width="70" 
+                 height="70"
+                 style="object-fit: cover; border-radius: 4px; border: 1px solid #ddd;">
+          </td>
+          <td class="namecell">
+            <strong>${produto.nome || 'Sem nome'}</strong><br>
+            <div class="cat">${categoriaTexto}</div>
+            ${infoExtra ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${infoExtra}</div>` : ''}
+          </td>
+          <td class="desccell">
+            ${produto.descricao || 'Sem descrição'}
+          </td>
+          <td class="pricecell">
+            <strong>${precoFormatado}</strong>
+          </td>
+          <td class="qtdcell">
+            <span class="estoque-badge ${produto.quantidade > 10 ? 'alto' : produto.quantidade > 0 ? 'medio' : 'baixo'}">
+              ${produto.quantidade || 0}
+            </span>
+          </td>
+          <td class="actions">
+            <button onclick="editarProduto('${produto.id}')" class="btn edit small">✏️ Editar</button>
+            <button onclick="excluirProduto('${produto.id}', '${produto.nome || 'este produto'}')" 
+                    class="btn danger small">🗑️ Excluir</button>
+          </td>
+        `;
+        
+        tbody.appendChild(tr);
+      });
+      
+      // Adicionar funcionalidade de busca
+      document.getElementById('busca').addEventListener('input', function(e) {
+        const termo = e.target.value.toLowerCase();
+        const linhas = tbody.querySelectorAll('tr');
+        
+        linhas.forEach(linha => {
+          const texto = linha.textContent.toLowerCase();
+          linha.style.display = texto.includes(termo) ? '' : 'none';
+        });
+      });
+      
+      // Adicionar filtro por categoria
+      document.getElementById('filtroCategoria').addEventListener('change', function(e) {
+        const categoria = e.target.value;
+        const linhas = tbody.querySelectorAll('tr');
+        
+        linhas.forEach(linha => {
+          if (!categoria) {
+            linha.style.display = '';
+            return;
+          }
+          
+          const categoriaLinha = linha.querySelector('.cat')?.textContent.toLowerCase() || '';
+          const categoriaFiltro = categoria.toLowerCase();
+          
+          // Mapear categorias para comparação
+          const mapaCategorias = {
+            'masculino': '👔 masculino',
+            'feminino': '👚 feminino', 
+            'infantil': '👶 infantil',
+            'acessorios': '👜 acessórios'
+          };
+          
+          const corresponde = categoriaLinha.includes(mapaCategorias[categoriaFiltro]) ||
+                            categoriaLinha.includes(categoriaFiltro);
+          
+          linha.style.display = corresponde ? '' : 'none';
+        });
+      });
+      
+      // Adicionar ordenação
+      document.getElementById('ordenarPor').addEventListener('change', function(e) {
+        const linhas = Array.from(tbody.querySelectorAll('tr'));
+        const ordenacao = e.target.value;
+        
+        linhas.sort((a, b) => {
+          const nomeA = a.querySelector('.namecell strong')?.textContent.toLowerCase() || '';
+          const nomeB = b.querySelector('.namecell strong')?.textContent.toLowerCase() || '';
+          const precoA = parseFloat(a.querySelector('.pricecell strong')?.textContent.replace(/[^\d,]/g, '').replace(',', '.') || 0);
+          const precoB = parseFloat(b.querySelector('.pricecell strong')?.textContent.replace(/[^\d,]/g, '').replace(',', '.') || 0);
+          const qtdA = parseInt(a.querySelector('.estoque-badge')?.textContent || 0);
+          const qtdB = parseInt(b.querySelector('.estoque-badge')?.textContent || 0);
+          
+          switch(ordenacao) {
+            case 'nome':
+              return nomeA.localeCompare(nomeB);
+            case 'preco_asc':
+              return precoA - precoB;
+            case 'preco_desc':
+              return precoB - precoA;
+            case 'quantidade_desc':
+              return qtdB - qtdA;
+            default:
+              return 0;
+          }
+        });
+        
+        // Reordenar na tabela
+        linhas.forEach(linha => tbody.appendChild(linha));
+      });
+      
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+      document.getElementById('tabelaBody').innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; color: #e74c3c; padding: 40px;">
+            <p>❌ Erro ao carregar produtos</p>
+            <p style="font-size: 14px;">${error.message}</p>
+            <button onclick="carregarProdutos()" class="btn primary" style="margin-top: 10px;">
+              Tentar novamente
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  // Função para editar produto
+  function editarProduto(id) {
+    window.location.href = `/templates/cadastro_produtos.html?id=${id}`;
+  }
+
+  // Função para excluir produto
+  async function excluirProduto(id, nomeProduto) {
+    if (!confirm(`Tem certeza que deseja excluir "${nomeProduto}"?`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/produtos/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao excluir produto');
+      }
+      
+      alert('✅ Produto excluído com sucesso!');
+      carregarProdutos(); // Recarregar lista
+      
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+      alert(`❌ Erro ao excluir produto: ${error.message}`);
+    }
+  }
+
+  // Botão atualizar
+  document.getElementById('btnAtualizar').addEventListener('click', carregarProdutos);
+  
+  // Adicionar estilo CSS dinâmico
+  const style = document.createElement('style');
+  style.textContent = `
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .estoque-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 14px;
+      min-width: 40px;
+      text-align: center;
+    }
+    
+    .estoque-badge.alto {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .estoque-badge.medio {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    
+    .estoque-badge.baixo {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .filters {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .filter-select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+    }
+    
+    .stats {
+      margin-left: auto;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .logout-btn {
+      background: none;
+      border: 1px solid #ddd;
+      color: #666;
+      margin-top: auto;
+    }
+    
+    .logout-btn:hover {
+      background: #f8f9fa;
+    }
+    
+    #menuLateralAdmin a.active {
+      background-color: #e3f2fd;
+      color: #1976d2;
+      border-left: 3px solid #1976d2;
+    }
+  `;
+  document.head.appendChild(style);
 </script>
 
-<script src="/static/js/lista_produtos.js"></script>
+</body>
+</html>

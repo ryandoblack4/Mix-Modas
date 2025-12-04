@@ -54,7 +54,6 @@
 </head>
 <body>
 
-    <!-- HEADER -->
     <header>
         <div class="logo">
             <a href="index.html" style="color: white; text-decoration: none; font-size: 1.5rem; font-weight: 700;">
@@ -72,7 +71,6 @@
         </div>
     </header>
 
-    <!-- NAV CATEGORIAS -->
     <nav>
         <ul>
             <li>
@@ -96,28 +94,23 @@
         </ul>
     </nav>
 
-    <!-- PROMO BAR ESPECIAL -->
     <div class="promo-bar" style="background: linear-gradient(45deg, #ff6b6b, #ff8e8e);">
         🔥 OFERTAS ESPECIAIS - Descontos de até 70%! 
     </div>
 
-    <!-- BREADCRUMB -->
     <div class="breadcrumb">
         <a href="index.html">Home</a> > <span>Ofertas</span>
     </div>
 
-    <!-- TÍTULO -->
     <section class="page-title">
         <h1>🔥 Ofertas Imperdíveis</h1>
         <p>Produtos selecionados com os melhores descontos!</p>
     </section>
 
-    <!-- CONTADOR DE OFERTA -->
     <div class="contador-oferta">
         ⏰ Oferta termina em: <span id="contador">23:59:59</span>
     </div>
 
-    <!-- FILTROS -->
     <section class="filters">
         <div class="filter-group">
             <label>Ordenar por:</label>
@@ -149,10 +142,8 @@
         </div>
     </section>
 
-    <!-- PRODUTOS EM OFERTA -->
     <section class="produtos-container">
         <div class="produtos-grid">
-            <!-- Oferta 1 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #ff4444;">-70%</div>
                 <img src="https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?w=300&h=300&fit=crop" alt="Tênis Esportivo" class="produto-imagem">
@@ -168,7 +159,6 @@
                 </div>
             </div>
 
-            <!-- Oferta 2 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #ff6b35;">-60%</div>
                 <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=300&h=300&fit=crop" alt="Blazer Social" class="produto-imagem">
@@ -184,7 +174,6 @@
                 </div>
             </div>
 
-            <!-- Oferta 3 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #4CAF50;">-55%</div>
                 <img src="https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=300&h=300&fit=crop" alt="Vestido Longo" class="produto-imagem">
@@ -200,7 +189,6 @@
                 </div>
             </div>
 
-            <!-- Oferta 4 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #2196F3;">-45%</div>
                 <img src="https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=300&h=300&fit=crop" alt="Relógio Smart" class="produto-imagem">
@@ -216,7 +204,6 @@
                 </div>
             </div>
 
-            <!-- Oferta 5 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #FF9800;">-65%</div>
                 <img src="https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=300&fit=crop" alt="Mochila Executiva" class="produto-imagem">
@@ -232,7 +219,6 @@
                 </div>
             </div>
 
-            <!-- Oferta 6 -->
             <div class="produto-card">
                 <div class="produto-tag" style="background: #9C27B0;">-50%</div>
                 <img src="https://images.unsplash.com/photo-1544441893-675973e31985?w=300&h=300&fit=crop" alt="Conjunto Esportivo" class="produto-imagem">
@@ -249,7 +235,6 @@
             </div>
         </div>
 
-        <!-- PAGINAÇÃO -->
         <div class="paginacao">
             <a href="#">‹</a>
             <a href="#" class="ativa">1</a>
@@ -259,7 +244,6 @@
         </div>
     </section>
 
-    <!-- BANNER PROMOCIONAL -->
     <section class="banner-promocional">
         <div class="banner-content">
             <h2>🎁 Cupom de Desconto Extra</h2>
@@ -268,7 +252,6 @@
         </div>
     </section>
 
-    <!-- FOOTER -->
     <footer>
         <div class="footer-content">
             <div class="footer-section">
@@ -330,7 +313,6 @@
             });
         });
 
-        // Contador regressivo para ofertas
         function atualizarContador() {
             const agora = new Date();
             const fimDoDia = new Date();
@@ -349,6 +331,16 @@
         setInterval(atualizarContador, 1000);
         atualizarContador();
     </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
 
 </body>
 </html>

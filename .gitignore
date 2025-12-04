@@ -1,0 +1,66 @@
+# Dependências do Node (se usar npm)
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# Arquivos de ambiente/sensíveis
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.firebase/
+serviceAccountKey.json
+firebase-config.js
+config.js
+keys.js
+secrets/
+config/    
+
+# Logs
+logs/
+*.log
+
+# Sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE/Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Build/Output
+dist/
+build/
+out/
+*.min.js
+*.min.css
+*.bundle.js
+
+# Cache
+.cache/
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Firebase
+.firebaserc
+.firebase/
+
+# Arquivos específicos do seu projeto
+# Exemplo: arquivos de configuração com chaves
+config/
+secrets/
+private/

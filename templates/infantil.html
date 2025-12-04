@@ -9,7 +9,6 @@
 <body>
     <button class="categories-toggle" onclick="toggleSidebar()">☰ Todas as Categorias</button>
 
-    <!-- Barra lateral de categorias -->
     <div class="categories-sidebar" id="categoriesSidebar">
         <h3>🛍️ Categorias</h3>
         <ul class="categories-list">
@@ -50,7 +49,7 @@
     </nav>
 
     <div class="promo-bar">
-        🚀 Frete grátis para compras acima de <span>R$99,99</span> 
+        Frete grátis para compras acima de <span>R$99,99</span> 
     </div>
 
     <div class="breadcrumb">
@@ -144,7 +143,6 @@
             }
         });
 
-        // Funções para controlar a barra lateral
         function toggleSidebar() {
             const sidebar = document.getElementById('categoriesSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -159,19 +157,28 @@
             overlay.classList.remove('active');
         }
 
-        // Fechar sidebar ao pressionar ESC
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeSidebar();
             }
         });
 
-        // Fechar sidebar ao clicar em um link
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.categories-list a').forEach(link => {
                 link.addEventListener('click', closeSidebar);
             });
         });
     </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+            if (typeof configurarFirebase === 'function') {
+                configurarFirebase(window.auth, window.db);
+            }
+        }
+    });
+</script>
+
 </body>
 </html>
