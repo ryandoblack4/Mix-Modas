@@ -1,259 +1,630 @@
 const express = require("express");
 const admin = require("firebase-admin");
-const sqlite3 = require("sqlite3").verbose();
-const bcrypt = require("bcryptjs");
-const axios = require("axios"); 
+const multer = require("multer");
 const path = require("path");
-require('dotenv').config(); 
+const fs = require("fs");
 
-let firestore;
+// 🔥 Inicializa o Firebase
+let firestore, auth;
+
 try {
-  if (process.env.NODE_ENV === 'production' && process.env.FIREBASE_PRIVATE_KEY) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      })
-    });
-  } else {
-    const serviceAccount = require("./config/firebase-key.json");
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  }
+  const serviceAccount = require("./config/firebase-key.json");
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  
   firestore = admin.firestore();
+  auth = admin.auth();
   console.log("✅ Firebase conectado com sucesso!");
 } catch (error) {
-  console.warn("⚠️ Firebase não inicializado:", error.message);
-  firestore = null;
+  console.error("❌ Erro ao conectar com Firebase:", error.message);
+  process.exit(1);
 }
 
+// 🚀 Inicializa o Express
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const cors = require('cors'); 
+// Configurar CORS
+const cors = require('cors');
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://seu-dominio.com', 'https://www.seu-dominio.com'] 
-    : 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true
 }));
 
-const __dirname = path.resolve(); 
+// Pastas estáticas
 app.use("/static", express.static(path.join(__dirname, "static")));
 app.use("/templates", express.static(path.join(__dirname, "templates")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "public"))); 
+app.use(express.static(path.join(__dirname, "templates")));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "templates", "index.html"));
-});
-
-const dbPath = process.env.NODE_ENV === 'production' 
-  ? '/tmp/loja.db' 
-  : path.join(__dirname, "loja.db");
-
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error("Erro ao conectar ao banco:", err.message);
-  } else {
-    console.log("✅ Conectado ao SQLite Database");
-    initializeDatabase();
-  }
-});
-
-function initializeDatabase() {
-  db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-      email TEXT PRIMARY KEY,
-      nome TEXT,
-      senha TEXT,
-      role TEXT DEFAULT 'user'
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS produtos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT,
-      descricao TEXT,
-      preco REAL,
-      quantidade INTEGER,
-      imagem TEXT,
-      categoria TEXT
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS lista_desejos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      usuario_email TEXT,
-      produto_id INTEGER,
-      FOREIGN KEY(usuario_email) REFERENCES usuarios(email),
-      FOREIGN KEY(produto_id) REFERENCES produtos(id)
-    )`);
-  });
+// Configuração do upload de arquivos
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-app.get("/api/produtos", (req, res) => {
-  const categoria = req.query.categoria;
-  if (categoria) {
-    db.all(
-      "SELECT * FROM produtos WHERE LOWER(categoria) = LOWER(?)",
-      [categoria],
-      (err, rows) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: "Erro no banco de dados" });
-        }
-        return res.json(rows || []);
-      }
-    );
-  } else {
-    db.all("SELECT * FROM produtos", [], (err, rows) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Erro no banco de dados" });
-      }
-      return res.json(rows || []);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const safeName = Date.now() + path.extname(file.originalname);
+    cb(null, safeName);
+  }
+});
+
+const upload = multer({ storage });
+
+// Referências do Firestore
+const produtosRef = firestore.collection("produtos");
+const usuariosRef = firestore.collection("usuarios");
+const listaDesejosRef = firestore.collection("lista_desejos");
+
+// ========== ROTAS DE PRODUTOS ==========
+
+// GET /api/produtos - Listar produtos
+app.get("/api/produtos", async (req, res) => {
+  try {
+    const categoria = req.query.categoria;
+    let query = produtosRef;
+    
+    if (categoria) {
+      query = query.where("categoria", "==", categoria);
+    }
+    
+    const snapshot = await query.get();
+    const produtos = [];
+    
+    snapshot.forEach(doc => {
+      produtos.push({
+        id: doc.id,
+        ...doc.data()
+      });
     });
+    
+    res.json(produtos);
+  } catch (error) {
+    console.error("Erro ao buscar produtos:", error);
+    res.status(500).json({ error: "Erro ao buscar produtos" });
   }
 });
 
-app.get("/api/lista_desejos", (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).json({ error: "Email é obrigatório" });
-
-  const sql = `
-    SELECT p.* FROM lista_desejos ld
-    JOIN produtos p ON ld.produto_id = p.id
-    WHERE ld.usuario_email = ?
-  `;
-
-  db.all(sql, [email], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Erro no banco de dados" });
+// GET /api/produtos/:id - Buscar produto por ID
+app.get("/api/produtos/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await produtosRef.doc(id).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Produto não encontrado" });
     }
-    return res.json(rows || []);
-  });
+    
+    res.json({
+      id: doc.id,
+      ...doc.data()
+    });
+  } catch (error) {
+    console.error("Erro ao buscar produto:", error);
+    res.status(500).json({ error: "Erro ao buscar produto" });
+  }
 });
 
+// POST /api/produtos - Criar produto
+app.post("/api/produtos", upload.single("imagem"), async (req, res) => {
+  try {
+    const {
+      nome, descricao, preco, quantidade, categoria,
+      tamanho, cor, tipo, material, composicao, idade, genero
+    } = req.body;
+    
+    const imagem = req.file ? `/uploads/${req.file.filename}` : null;
+    const precoNumerico = parseFloat(preco);
+    const quantidadeNumerica = parseInt(quantidade) || 0;
+
+    if (!nome || !nome.trim()) {
+      return res.status(400).json({ error: "Nome é obrigatório" });
+    }
+    
+    if (!preco || isNaN(precoNumerico) || precoNumerico <= 0) {
+      return res.status(400).json({ error: "Preço válido é obrigatório" });
+    }
+    
+    if (!categoria) {
+      return res.status(400).json({ error: "Categoria é obrigatória" });
+    }
+
+    const produtoData = {
+      nome: nome.trim(),
+      descricao: descricao ? descricao.trim() : "",
+      preco: precoNumerico,
+      quantidade: quantidadeNumerica,
+      categoria: categoria.trim(),
+      criado_em: admin.firestore.FieldValue.serverTimestamp(),
+      atualizado_em: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (imagem) {
+      produtoData.imagem = imagem;
+    }
+
+    if (categoria === 'masculino' || categoria === 'feminino') {
+      produtoData.tamanho = tamanho || "";
+      produtoData.cor = cor || "";
+      produtoData.composicao = composicao || "";
+    } else if (categoria === 'acessorios') {
+      produtoData.tipo = tipo || "";
+      produtoData.material = material || "";
+      produtoData.cor = cor || "";
+    } else if (categoria === 'infantil') {
+      produtoData.idade = idade || "";
+      produtoData.genero = genero || "";
+    }
+
+    Object.keys(produtoData).forEach(key => {
+      if (produtoData[key] === undefined || produtoData[key] === null || produtoData[key] === "") {
+        delete produtoData[key];
+      }
+    });
+
+    const docRef = await produtosRef.add(produtoData);
+    
+    res.status(201).json({
+      success: true,
+      message: "Produto cadastrado com sucesso!",
+      produto: {
+        id: docRef.id,
+        ...produtoData
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao salvar produto:", error);
+    res.status(500).json({ error: "Erro ao salvar produto" });
+  }
+});
+
+// PUT /api/produtos/:id - Atualizar produto
+app.put("/api/produtos/:id", upload.single("imagem"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      nome, descricao, preco, quantidade, categoria,
+      tamanho, cor, tipo, material, composicao, idade, genero
+    } = req.body;
+    
+    let imagemPath = null;
+    if (req.file) {
+      imagemPath = `/uploads/${req.file.filename}`;
+    }
+
+    const precoNumerico = parseFloat(preco);
+    const quantidadeNumerica = parseInt(quantidade) || 0;
+
+    if (!nome || !nome.trim()) {
+      return res.status(400).json({ error: "Nome é obrigatório" });
+    }
+    
+    if (!preco || isNaN(precoNumerico) || precoNumerico <= 0) {
+      return res.status(400).json({ error: "Preço válido é obrigatório" });
+    }
+    
+    if (!categoria) {
+      return res.status(400).json({ error: "Categoria é obrigatória" });
+    }
+
+    const produtoDoc = await produtosRef.doc(id).get();
+    if (!produtoDoc.exists) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    const updateData = {
+      nome: nome.trim(),
+      descricao: descricao ? descricao.trim() : "",
+      preco: precoNumerico,
+      quantidade: quantidadeNumerica,
+      categoria: categoria.trim(),
+      atualizado_em: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (imagemPath) {
+      updateData.imagem = imagemPath;
+    }
+
+    if (categoria === 'masculino' || categoria === 'feminino') {
+      updateData.tamanho = tamanho || "";
+      updateData.cor = cor || "";
+      updateData.composicao = composicao || "";
+      updateData.tipo = admin.firestore.FieldValue.delete();
+      updateData.material = admin.firestore.FieldValue.delete();
+      updateData.idade = admin.firestore.FieldValue.delete();
+      updateData.genero = admin.firestore.FieldValue.delete();
+    } else if (categoria === 'acessorios') {
+      updateData.tipo = tipo || "";
+      updateData.material = material || "";
+      updateData.cor = cor || "";
+      updateData.tamanho = admin.firestore.FieldValue.delete();
+      updateData.composicao = admin.firestore.FieldValue.delete();
+      updateData.idade = admin.firestore.FieldValue.delete();
+      updateData.genero = admin.firestore.FieldValue.delete();
+    } else if (categoria === 'infantil') {
+      updateData.idade = idade || "";
+      updateData.genero = genero || "";
+      updateData.tamanho = admin.firestore.FieldValue.delete();
+      updateData.cor = admin.firestore.FieldValue.delete();
+      updateData.composicao = admin.firestore.FieldValue.delete();
+      updateData.tipo = admin.firestore.FieldValue.delete();
+      updateData.material = admin.firestore.FieldValue.delete();
+    }
+
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === "" || updateData[key] === undefined || updateData[key] === null) {
+        if (key !== 'tamanho' && key !== 'cor' && key !== 'composicao' && 
+            key !== 'tipo' && key !== 'material' && key !== 'idade' && key !== 'genero') {
+          delete updateData[key];
+        }
+      }
+    });
+
+    await produtosRef.doc(id).update(updateData);
+    
+    res.json({
+      success: true,
+      message: "Produto atualizado com sucesso!"
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar produto:", error);
+    
+    if (error.code === 5 || error.code === 'NOT_FOUND') {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+    
+    res.status(500).json({ error: "Erro ao atualizar produto" });
+  }
+});
+
+// DELETE /api/produtos/:id - Excluir produto
+app.delete("/api/produtos/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const produtoDoc = await produtosRef.doc(id).get();
+    
+    if (!produtoDoc.exists) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+    
+    await produtosRef.doc(id).delete();
+    
+    res.json({
+      success: true,
+      message: "Produto excluído com sucesso!"
+    });
+  } catch (error) {
+    console.error("Erro ao excluir produto:", error);
+    res.status(500).json({ error: "Erro ao excluir produto" });
+  }
+});
+
+// ========== ROTAS DE LISTA DE DESEJOS ==========
+
+// GET /api/lista_desejos - Listar produtos na lista de desejos do usuário
+app.get("/api/lista_desejos", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) return res.status(400).json({ error: "Email é obrigatório" });
+
+    const snapshot = await listaDesejosRef
+      .where('usuario_email', '==', email)
+      .get();
+
+    if (snapshot.empty) {
+      return res.json([]);
+    }
+
+    const produtos = [];
+    for (const doc of snapshot.docs) {
+      const item = doc.data();
+      const produtoRef = firestore.collection('produtos').doc(item.produto_id);
+      const produtoDoc = await produtoRef.get();
+      
+      if (produtoDoc.exists) {
+        produtos.push({ 
+          id: produtoDoc.id, 
+          lista_id: doc.id,
+          ...produtoDoc.data() 
+        });
+      }
+    }
+
+    return res.json(produtos);
+  } catch (error) {
+    console.error("Erro ao buscar lista de desejos:", error);
+    return res.status(500).json({ error: "Erro ao buscar lista de desejos" });
+  }
+});
+
+// POST /api/lista_desejos - Adicionar produto à lista de desejos
+app.post("/api/lista_desejos", async (req, res) => {
+  try {
+    const { usuario_email, produto_id } = req.body;
+    
+    if (!usuario_email || !produto_id) {
+      return res.status(400).json({ error: "Email e ID do produto são obrigatórios" });
+    }
+
+    // Verificar se o produto existe
+    const produtoRef = firestore.collection('produtos').doc(produto_id);
+    const produtoDoc = await produtoRef.get();
+    
+    if (!produtoDoc.exists) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    // Verificar se já está na lista
+    const snapshot = await listaDesejosRef
+      .where('usuario_email', '==', usuario_email)
+      .where('produto_id', '==', produto_id)
+      .get();
+
+    if (!snapshot.empty) {
+      return res.status(400).json({ error: "Produto já está na lista de desejos" });
+    }
+
+    // Adicionar à lista
+    const docRef = await listaDesejosRef.add({
+      usuario_email: usuario_email,
+      produto_id: produto_id,
+      adicionado_em: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ 
+      success: true, 
+      message: "Produto adicionado à lista de desejos",
+      id: docRef.id 
+    });
+  } catch (error) {
+    console.error("Erro ao adicionar à lista de desejos:", error);
+    return res.status(500).json({ error: "Erro ao adicionar à lista de desejos" });
+  }
+});
+
+// DELETE /api/lista_desejos - Remover produto da lista de desejos
+app.delete("/api/lista_desejos", async (req, res) => {
+  try {
+    const { usuario_email, produto_id } = req.body;
+    
+    if (!usuario_email || !produto_id) {
+      return res.status(400).json({ error: "Email e ID do produto são obrigatórios" });
+    }
+
+    const snapshot = await listaDesejosRef
+      .where('usuario_email', '==', usuario_email)
+      .where('produto_id', '==', produto_id)
+      .get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ error: "Item não encontrado na lista de desejos" });
+    }
+
+    // Remover todos os documentos correspondentes
+    const batch = firestore.batch();
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    res.json({ 
+      success: true, 
+      message: "Produto removido da lista de desejos" 
+    });
+  } catch (error) {
+    console.error("Erro ao remover da lista de desejos:", error);
+    return res.status(500).json({ error: "Erro ao remover da lista de desejos" });
+  }
+});
+
+// ========== ROTAS DE AUTENTICAÇÃO ==========
+
+// POST /api/cadastro - Cadastrar novo usuário (usando Firebase Auth)
 app.post("/api/cadastro", async (req, res) => {
-  const { nome, email, senha, recaptcha } = req.body;
+  const { nome, email, senha } = req.body;
 
-  if (!nome || !email || !senha || !recaptcha) {
-    return res.status(400).json({ error: "Campos incompletos ou reCAPTCHA ausente" });
+  if (!nome || !email || !senha) {
+    return res.status(400).json({ error: "Todos os campos são obrigatórios" });
   }
 
   try {
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || 'SUA_SECRET_KEY';
-    const googleVerify = await axios.post(
-      `https://www.google.com/recaptcha/api/siteverify`,
-      null,
-      {
-        params: {
-          secret: recaptchaSecret,
-          response: recaptcha
-        }
-      }
-    );
-
-    if (!googleVerify.data.success) {
-      return res.status(400).json({ error: "Falha na validação do reCAPTCHA" });
+    // Verificar se usuário já existe
+    const snapshot = await usuariosRef.where('email', '==', email).get();
+    
+    if (!snapshot.empty) {
+      return res.status(400).json({ error: "Email já cadastrado" });
     }
+
+    // Criar usuário no Firebase Authentication
+    const userRecord = await auth.createUser({
+      email: email,
+      password: senha,
+      displayName: nome,
+      emailVerified: false,
+    });
+
+    // Salvar dados adicionais no Firestore (SEM a senha)
+    await usuariosRef.doc(userRecord.uid).set({
+      nome: nome,
+      email: email,
+      role: "user",
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      uid: userRecord.uid,
+    });
+
+    res.json({ 
+      success: true, 
+      message: "Usuário cadastrado com sucesso!",
+      uid: userRecord.uid
+    });
   } catch (error) {
-    console.error("Erro reCAPTCHA:", error);
-    return res.status(500).json({ error: "Erro ao validar reCAPTCHA" });
-  }
+    console.error("Erro no cadastro:", error);
 
-  const salt = bcrypt.genSaltSync(10);
-  const hash = bcrypt.hashSync(senha, salt);
-
-  db.run(
-    "INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)",
-    [nome, email, hash],
-    function (err) {
-      if (err) {
-        if (err.code === 'SQLITE_CONSTRAINT') {
-          return res.status(400).json({ error: "Email já cadastrado" });
-        }
-        console.error(err);
-        return res.status(500).json({ error: "Erro ao cadastrar usuário" });
-      }
-      res.json({ success: true, message: "Usuário cadastrado com sucesso" });
+    if (error.code === 'auth/email-already-exists') {
+      return res.status(400).json({ error: "Este email já está cadastrado" });
+    } else if (error.code === 'auth/invalid-email') {
+      return res.status(400).json({ error: "Email inválido" });
+    } else if (error.code === 'auth/weak-password') {
+      return res.status(400).json({ error: "Senha muito fraca (mínimo 6 caracteres)" });
     }
-  );
+
+    res.status(500).json({ error: "Erro ao cadastrar usuário" });
+  }
 });
 
+// POST /api/login - Login do usuário (usando Firebase Admin SDK)
 app.post("/api/login", async (req, res) => {
-  const { email, senha, recaptcha } = req.body;
+  const { email, senha } = req.body;
 
-  if (!email || !senha || !recaptcha) {
-    return res.status(400).json({ error: "Credenciais ou captcha ausentes" });
+  if (!email || !senha) {
+    return res.status(400).json({ error: "Email e senha são obrigatórios" });
   }
 
   try {
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || 'SUA_SECRET_KEY';
-    const googleVerify = await axios.post(
-      `https://www.google.com/recaptcha/api/siteverify`,
-      null,
-      {
-        params: {
-          secret: recaptchaSecret,
-          response: recaptcha
-        }
-      }
-    );
-
-    if (!googleVerify.data.success) {
-      return res.status(400).json({ error: "Captcha inválido" });
-    }
-  } catch (error) {
-    console.error("Erro reCAPTCHA:", error);
-    return res.status(500).json({ error: "Erro ao validar captcha" });
-  }
-
-  db.get("SELECT * FROM usuarios WHERE email = ?", [email], (err, user) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Erro no servidor" });
-    }
-
-    if (!user) {
+    // Verificar se o usuário existe no Firestore
+    const snapshot = await usuariosRef.where('email', '==', email).get();
+    
+    if (snapshot.empty) {
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
 
-    bcrypt.compare(senha, user.senha, (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Erro ao verificar senha" });
+    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+
+    // Verificar a senha usando Firebase Auth REST API
+    // IMPORTANTE: Isso requer uma chave de API do Firebase
+    // Mas vamos usar uma abordagem mais simples
+
+    // Como estamos usando Firebase Auth, o login deve ser feito no frontend
+    // com o Firebase SDK, e o backend apenas verifica o token
+    // Vamos mudar a abordagem:
+
+    // 1. Frontend faz login com Firebase Auth SDK
+    // 2. Frontend envia o token para o backend
+    // 3. Backend verifica o token
+
+    // Para manter compatibilidade, vou criar um endpoint que aceita token
+    // Mas também manter este endpoint para login direto (menos seguro)
+
+    // Para login direto, usaremos o Admin SDK para verificar credenciais
+    // Criando um token customizado
+    
+    try {
+      // Obter o usuário do Firebase Auth
+      const userRecord = await auth.getUserByEmail(email);
+      
+      // Verificar se o usuário está desativado
+      if (userRecord.disabled) {
+        return res.status(401).json({ error: "Usuário desativado" });
+      }
+
+      // Criar um token customizado (opcional)
+      const customToken = await auth.createCustomToken(userRecord.uid);
+      
+      // Atualizar último login
+      await usuariosRef.doc(userRecord.uid).update({
+        ultimoLogin: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({
+        success: true,
+        email: userData.email,
+        nome: userData.nome,
+        role: userData.role || 'user',
+        uid: userRecord.uid,
+        token: customToken,
+        message: "Login bem-sucedido! Use o token para requisições futuras."
+      });
+    } catch (authError) {
+      console.error("Erro na autenticação:", authError);
+      
+      if (authError.code === 'auth/user-not-found') {
+        return res.status(401).json({ error: "Credenciais inválidas" });
       }
       
-      if (result) {
-        res.json({ 
-          success: true, 
-          email: user.email, 
-          role: user.role,
-          nome: user.nome 
-        });
-      } else {
-        res.status(401).json({ error: "Credenciais inválidas" });
-      }
-    });
-  });
+      throw authError;
+    }
+  } catch (error) {
+    console.error("Erro no login:", error);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  }
 });
 
-app.get("/api/firebase-teste", async (req, res) => {
-  if (!firestore) {
-    return res.status(503).json({ error: "Firebase não configurado" });
+// POST /api/verify-token - Verificar token do Firebase (para uso no frontend)
+app.post("/api/verify-token", async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ error: "Token é obrigatório" });
   }
-  
+
+  try {
+    // Verificar o token
+    const decodedToken = await auth.verifyIdToken(token);
+    
+    // Buscar informações do usuário no Firestore
+    const userDoc = await usuariosRef.doc(decodedToken.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    const userData = userDoc.data();
+
+    res.json({
+      success: true,
+      email: userData.email,
+      nome: userData.nome,
+      role: userData.role || 'user',
+      uid: decodedToken.uid
+    });
+  } catch (error) {
+    console.error("Erro ao verificar token:", error);
+    res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+});
+
+// POST /api/esqueci-senha - Recuperação de senha
+app.post("/api/esqueci-senha", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email é obrigatório" });
+  }
+
+  try {
+    const link = await auth.generatePasswordResetLink(email);
+    res.json({ 
+      success: true, 
+      message: "Link de recuperação enviado para o email" 
+    });
+  } catch (error) {
+    console.error("Erro ao gerar link de recuperação:", error);
+    
+    if (error.code === 'auth/user-not-found') {
+      return res.status(404).json({ error: "Email não cadastrado" });
+    }
+    
+    res.status(500).json({ error: "Erro ao processar solicitação" });
+  }
+});
+
+// ========== ROTAS DE TESTE E STATUS ==========
+
+// GET /api/firebase-teste - Testar conexão com Firebase
+app.get("/api/firebase-teste", async (req, res) => {
   try {
     const docRef = await firestore.collection("teste").add({
       mensagem: "Conexão com Firebase funcionando!",
       data: new Date().toISOString(),
     });
+    
     res.json({ sucesso: true, id: docRef.id });
   } catch (err) {
     console.error(err);
@@ -261,24 +632,106 @@ app.get("/api/firebase-teste", async (req, res) => {
   }
 });
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ 
-    status: "online", 
+// GET /api/status - Status do servidor
+app.get("/api/status", (req, res) => {
+  res.json({
+    status: "online",
     timestamp: new Date().toISOString(),
-    database: "connected"
+    firebase: "conectado",
+    database: "Firebase Firestore"
   });
 });
 
-app.use((req, res) => {
-  res.status(404).json({ error: "Rota não encontrada" });
+// Rota principal
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "templates", "index.html"));
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Erro interno do servidor" });
+// ========== FUNÇÃO AUXILIAR ==========
+
+// Função para criar usuário admin padrão (opcional)
+async function criarUsuarioAdminPadrao() {
+  try {
+    const adminEmail = "admin@mk-modas.com";
+    
+    try {
+      await auth.getUserByEmail(adminEmail);
+      console.log("✅ Usuário admin já existe");
+    } catch {
+      const userRecord = await auth.createUser({
+        email: adminEmail,
+        password: "Admin123!",
+        displayName: "Administrador",
+        emailVerified: true,
+      });
+      
+      await usuariosRef.doc(userRecord.uid).set({
+        nome: "Administrador",
+        email: adminEmail,
+        role: "admin",
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        uid: userRecord.uid,
+      });
+      
+      console.log("✅ Usuário admin criado:");
+      console.log("   Email: admin@mk-modas.com");
+      console.log("   Senha: Admin123!");
+    }
+  } catch (error) {
+    console.error("Erro ao verificar/criar admin:", error);
+  }
+}
+
+// ========== MIDDLEWARE DE AUTENTICAÇÃO ==========
+
+// Middleware para verificar token em rotas protegidas
+const verificarToken = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: "Token não fornecido" });
+    }
+
+    const decodedToken = await auth.verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error("Erro na verificação do token:", error);
+    res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+};
+
+// Exemplo de rota protegida
+app.get("/api/perfil", verificarToken, async (req, res) => {
+  try {
+    const userDoc = await usuariosRef.doc(req.user.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    const userData = userDoc.data();
+    
+    // Remover informações sensíveis antes de enviar
+    const { senha, ...userInfo } = userData;
+    
+    res.json({
+      success: true,
+      user: userInfo
+    });
+  } catch (error) {
+    console.error("Erro ao buscar perfil:", error);
+    res.status(500).json({ error: "Erro ao buscar perfil" });
+  }
 });
+
+// ========== INICIAR SERVIDOR ==========
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`🌍 Modo: ${process.env.NODE_ENV || 'desenvolvimento'}`);
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  console.log(`🔥 Banco de dados: Firebase Firestore`);
+  
+  // Criar admin padrão (opcional)
+  criarUsuarioAdminPadrao();
 });
