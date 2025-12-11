@@ -8,16 +8,19 @@ const fs = require("fs");
 let firestore, auth;
 
 try {
-  const serviceAccount = require("./config/firebase-key.json");
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert({
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    })
   });
-  
+
   firestore = admin.firestore();
   auth = admin.auth();
-  console.log("✅ Firebase conectado com sucesso!");
+  console.log("✅ Firebase conectado com sucesso via variáveis de ambiente!");
 } catch (error) {
-  console.error("❌ Erro ao conectar com Firebase:", error.message);
+  console.error("❌ Erro ao conectar com Firebase:", error);
   process.exit(1);
 }
 
