@@ -5,23 +5,28 @@ const path = require("path");
 const fs = require("fs");
 
 // 🔥 Inicializa o Firebase
+import admin from "firebase-admin";
+
 let firestore, auth;
 
 try {
   admin.initializeApp({
     credential: admin.credential.cert({
+      type: "service_account",
       project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
       client_email: process.env.FIREBASE_CLIENT_EMAIL,
-      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      client_id: process.env.FIREBASE_CLIENT_ID,
     })
   });
 
   firestore = admin.firestore();
   auth = admin.auth();
-  console.log("✅ Firebase conectado com sucesso via variáveis de ambiente!");
+
+  console.log("✅ Firebase conectado com sucesso via Render!");
 } catch (error) {
   console.error("❌ Erro ao conectar com Firebase:", error);
-  process.exit(1);
 }
 
 // 🚀 Inicializa o Express
