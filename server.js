@@ -28,8 +28,7 @@ try {
 
     firestore = admin.firestore();
     auth = admin.auth();
-
-    console.log("✅ Firebase conectado com sucesso!");
+    console.log("🔥 Firebase conectado com sucesso!");
   } else {
     console.warn("⚠️ Firebase não configurado (variáveis ausentes)");
   }
@@ -41,13 +40,20 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: "*", credentials: true }));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ================== STATIC FILES ==================
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/templates", express.static(path.join(__dirname, "templates")));
+app.use("/static", express.static(path.join(__dirname, "static")));
+
+// ================== FRONTEND ==================
+// 👉 ISSO AQUI É O QUE FAZ O SITE APARECER
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "templates", "index.html"));
+});
 
 // ================== UPLOAD ==================
 const uploadsDir = path.join(__dirname, "uploads");
@@ -68,12 +74,15 @@ const produtosRef = firestore ? firestore.collection("produtos") : null;
 const usuariosRef = firestore ? firestore.collection("usuarios") : null;
 const listaDesejosRef = firestore ? firestore.collection("lista_desejos") : null;
 
-// ================== ROTAS ==================
-app.get("/", (req, res) => {
-  res.send("🚀 API Mix Modas rodando no Render!");
+// ================== API ==================
+app.get("/api/status", (req, res) => {
+  res.json({
+    status: "online",
+    firebase: firestore ? "conectado" : "não configurado",
+    timestamp: new Date().toISOString()
+  });
 });
 
-// -------- PRODUTOS --------
 app.get("/api/produtos", async (req, res) => {
   if (!produtosRef) {
     return res.status(503).json({ error: "Firebase não configurado" });
@@ -124,7 +133,6 @@ app.post("/api/produtos", upload.single("imagem"), async (req, res) => {
   }
 });
 
-// -------- LISTA DE DESEJOS --------
 app.post("/api/lista_desejos", async (req, res) => {
   if (!listaDesejosRef) {
     return res.status(503).json({ error: "Firebase não configurado" });
@@ -146,15 +154,6 @@ app.post("/api/lista_desejos", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Erro ao salvar lista de desejos" });
   }
-});
-
-// -------- STATUS --------
-app.get("/api/status", (req, res) => {
-  res.json({
-    status: "online",
-    firebase: firestore ? "conectado" : "não configurado",
-    timestamp: new Date().toISOString()
-  });
 });
 
 // ================== START ==================
