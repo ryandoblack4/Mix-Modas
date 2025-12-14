@@ -14,6 +14,7 @@ async function loginFirebaseFrontend(email, senha) {
     localStorage.setItem('userUID', user.uid);
     localStorage.setItem('userEmail', user.email);
     localStorage.setItem('userName', user.displayName || email.split('@')[0]);
+    localStorage.setItem('usuarioLogado', 'true');
     
     console.log("✅ Login Firebase frontend bem-sucedido:", user.email);
     

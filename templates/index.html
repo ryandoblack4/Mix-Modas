@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mix-Modas</title>
   <link rel="stylesheet" href="/static/css/style_index.css">
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-    <script src="/static/js/firebase-auth.js"></script>
+
+  <!-- Firebase SDK (inicialize antes de qualquer outro script) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <button class="categories-toggle" onclick="toggleSidebar()">☰ Todas as Categorias</button>
@@ -104,159 +105,40 @@
     </div>
   </footer>
 
+  <!-- Global JS -->
   <script src="/static/js/global.js"></script>
+
+  <!-- Firebase initialization script (depois de inicializar Firebase) -->
   <script>
-    function toggleSidebar() {
-      const sidebar = document.getElementById('categoriesSidebar');
-      const overlay = document.getElementById('sidebarOverlay');
-      sidebar.classList.toggle('active');
-      overlay.classList.toggle('active');
-    }
+    const firebaseConfig = {
+      apiKey: "AIzaSyAhtHCacGDIR_49DMmVxBWuqLRocwSgRDk",
+      authDomain: "sistema-de-loja-85c8a.firebaseapp.com",
+      databaseURL: "https://sistema-de-loja-85c8a-default-rtdb.firebaseio.com",
+      projectId: "sistema-de-loja-85c8a",
+      storageBucket: "sistema-de-loja-85c8a.firebasestorage.app",
+      messagingSenderId: "514984327740",
+      appId: "1:514984327740:web:f63757577a32d0fa8da139"
+    };
 
-    function closeSidebar() {
-      const sidebar = document.getElementById('categoriesSidebar');
-      const overlay = document.getElementById('sidebarOverlay');
-      sidebar.classList.remove('active');
-      overlay.classList.remove('active');
-    }
-    function adicionarAoCarrinho(produto) {
-      let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-      const produtoExistente = carrinho.find(p => p.id === produto.id);
-      
-      if (produtoExistente) {
-        produtoExistente.quantidade += 1;
-      } else {
-        carrinho.push({
-          ...produto,
-          quantidade: 1
-        });
-      }
-      
-      localStorage.setItem('carrinho', JSON.stringify(carrinho));
-      if (typeof atualizarCarrinhoVisual === 'function') {
-        atualizarCarrinhoVisual();
-      }
-      alert(`${produto.nome} adicionado ao carrinho!`);
-    }
+    firebase.initializeApp(firebaseConfig);
+    
+    window.auth = firebase.auth();
+    window.db = firebase.firestore();
+    
+    console.log("🔥 Firebase inicializado no frontend!");
+  </script>
 
-    function pesquisar() {
-      const termo = document.getElementById('searchInput').value;
-      if (termo.trim()) {
-        alert(`Pesquisando por: ${termo}`);
-      }
-    }
-    document.addEventListener("DOMContentLoaded", () => {
-      const container = document.getElementById("produtos-grid");
-      document.querySelectorAll('.categories-list a').forEach(link => {
-        link.addEventListener('click', closeSidebar);
-      });
+  <!-- Firebase Auth functions -->
+  <script src="/static/js/firebase-auth.js"></script>
 
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-          closeSidebar();
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
+        if (typeof configurarFirebase === 'function') {
+          configurarFirebase(window.auth, window.db);
         }
-      });
-
-      document.getElementById('searchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          pesquisar();
-        }
-      });
-
-      const produtosDestaque = [
-        { 
-          id: 1, 
-          nome: "Vestido Floral Verão", 
-          preco: 89.90, 
-          imagem: "https://s.emporionm.com.br/import/zip.zip/NM003311_1.jpg?format=webp",
-          categoria: "feminino"
-        },
-        { 
-          id: 2, 
-          nome: "Camisa Polo Masculina", 
-          preco: 99.90, 
-          imagem: "https://www.lojamirante.com.br/uploads/produtos/camisa-polo-pa-azul-royal-617cb70f9d839.jpg",
-          categoria: "masculino"
-        },
-        { 
-          id: 3, 
-          nome: "Conjunto Infantil", 
-          preco: 59.90, 
-          imagem: "https://static.ecosweb.com.br/public/produtos/roupa-para-menino/conjunto-inverno/conjunto-esportivo-basquete-menino-marrom_790742_600_1.webp",
-          categoria: "infantil"
-        },
-        { 
-          id: 4, 
-          nome: "Bolsa de Couro", 
-          preco: 129.90, 
-          imagem: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=300&fit=crop",
-          categoria: "acessorios"
-        }
-      ];
-
-      fetch('/api/produtos')
-        .then(res => res.json())
-        .then(produtos => {
-          exibirProdutos(produtos.length ? produtos : produtosDestaque);
-        })
-        .catch(err => {
-          console.error('Erro ao carregar produtos:', err);
-          exibirProdutos(produtosDestaque);
-        });
-
-      function exibirProdutos(produtos) {
-  if (!produtos.length) {
-    container.innerHTML = '<p class="aviso-vazio">Nenhum produto cadastrado ainda.</p>';
-    return;
-  }
-
-  container.innerHTML = produtos.map(prod => `
-    <div class="produto-card" onclick="verDetalhes(${prod.id})">
-      <div class="produto-imagem">
-        <img src="${prod.imagem || '/static/img/sem-foto.png'}" alt="${prod.nome}">
-      </div>
-      <div class="produto-info">
-        <h3 class="produto-nome">${prod.nome}</h3>
-        <p class="produto-preco">R$ ${prod.preco.toFixed(2)}</p>
-      </div>
-    </div>
-  `).join('');
-}
-
-function verDetalhes(id) {
-  localStorage.setItem('produtoSelecionado', id);
-  window.location.href = '/templates/detalhes_produto.html';
-}
+      }
     });
   </script>
- <script>
-        const firebaseConfig = {
-           apiKey: "AIzaSyAhtHCacGDIR_49DMmVxBWuqLRocwSgRDk",
-           authDomain: "sistema-de-loja-85c8a.firebaseapp.com",
-           databaseURL: "https://sistema-de-loja-85c8a-default-rtdb.firebaseio.com",
-           projectId: "sistema-de-loja-85c8a",
-           storageBucket: "sistema-de-loja-85c8a.firebasestorage.app",
-           messagingSenderId: "514984327740",
-           appId: "1:514984327740:web:f63757577a32d0fa8da139"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        
-        window.auth = firebase.auth();
-        window.db = firebase.firestore();
-        
-        console.log("🔥 Firebase inicializado no frontend!");
-   </script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window !== 'undefined' && window.firebase && window.auth && window.db) {
-            if (typeof configurarFirebase === 'function') {
-                configurarFirebase(window.auth, window.db);
-            }
-        }
-    });
-</script>
-
 </body>
 </html>
