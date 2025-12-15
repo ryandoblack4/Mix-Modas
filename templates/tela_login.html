@@ -4,16 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Mix-Modas</title>
-
   <link rel="stylesheet" href="/static/css/style_login.css">
-
-  <!-- FIREBASE (ORDEM IMPORTANTE) -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-
-  <!-- SEU SCRIPT -->
-  <script src="/static/js/firebase-auth.js"></script>
-
+  
   <style>
     .logo-section {
       background: #000;
@@ -32,6 +24,37 @@
       font-size: 14px;
       margin-top: 10px;
     }
+    .error-message {
+      color: #e74c3c;
+      background: #fdeaea;
+      padding: 12px;
+      border-radius: 5px;
+      margin-top: 15px;
+      font-size: 14px;
+      border-left: 4px solid #e74c3c;
+    }
+    .success-message {
+      color: #27ae60;
+      background: #eafaf1;
+      padding: 12px;
+      border-radius: 5px;
+      margin-top: 15px;
+      font-size: 14px;
+      border-left: 4px solid #27ae60;
+    }
+    .links-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .links-container a {
+      color: #3498db;
+      text-decoration: none;
+      display: inline-block;
+      margin: 5px 0;
+    }
+    .links-container a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -45,59 +68,179 @@
 
   <div>
     <label for="email">E-mail</label>
-    <input type="email" id="email" placeholder="seu@email.com" required>
+    <input type="email" id="email" placeholder="seu@email.com" required autocomplete="email">
   </div>
 
   <div>
     <label for="password">Senha</label>
-    <input type="password" id="password" placeholder="Sua senha" required>
+    <input type="password" id="password" placeholder="Sua senha" required autocomplete="current-password">
   </div>
 
-  <button type="submit" class="login-button">Entrar</button>
-  <div id="loading" class="loading">Processando...</div>
-
+  <button type="submit" class="login-button" id="submitBtn">
+    <span id="btnText">Entrar</span>
+    <span id="btnLoading" style="display: none;">Processando...</span>
+  </button>
+  
   <div class="links-container">
     <a href="/templates/tela_cadastro.html">Criar conta</a><br>
+    <a href="/templates/tela_recuperar_senha.html">Esqueci minha senha</a><br>
     <a href="/templates/index.html">← Voltar para a loja</a>
   </div>
 
   <div id="mensagem"></div>
 </form>
 
+<!-- SCRIPT DO FIREBASE (ORDEM IMPORTANTE) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="/static/js/firebase-auth.js"></script>
+
 <script>
-  document.getElementById("loginForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const email = document.getElementById("email").value.trim();
-    const senha = document.getElementById("password").value.trim();
-    const mensagem = document.getElementById("mensagem");
-    const loading = document.getElementById("loading");
-
-    mensagem.textContent = "";
-    loading.style.display = "block";
-
-    if (!email || !senha) {
-      mensagem.textContent = "Preencha e-mail e senha.";
-      loading.style.display = "none";
+  // Aguardar o DOM estar pronto
+  document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById("loginForm");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const mensagemDiv = document.getElementById("mensagem");
+    const submitBtn = document.getElementById("submitBtn");
+    const btnText = document.getElementById("btnText");
+    const btnLoading = document.getElementById("btnLoading");
+    
+    // Verificar se já está logado
+    if (typeof verificarUsuarioLogado === 'function' && verificarUsuarioLogado()) {
+      mensagemDiv.textContent = "Você já está logado! Redirecionando...";
+      mensagemDiv.className = "success-message";
+      
+      setTimeout(() => {
+        window.location.href = "/templates/index.html";
+      }, 1500);
       return;
     }
-
-    // 👉 LOGIN PELO FIREBASE FRONTEND
-    const resultado = await loginFirebaseFrontend(email, senha);
-
-    loading.style.display = "none";
-
-    if (!resultado.success) {
-      mensagem.textContent = resultado.error;
-      return;
+    
+    // Verificar estado do Firebase (debug)
+    console.log("Estado Firebase:", typeof verificarEstadoFirebase === 'function' 
+      ? verificarEstadoFirebase() 
+      : "Função não disponível");
+    
+    // Inicializar Firebase ao carregar a página
+    if (typeof initializeFirebase === 'function') {
+      initializeFirebase().then(app => {
+        if (app) {
+          console.log("✅ Firebase pronto para uso");
+        }
+      }).catch(error => {
+        console.error("❌ Erro ao inicializar Firebase:", error);
+      });
     }
-
-    mensagem.style.color = "#27ae60";
-    mensagem.textContent = "Login realizado com sucesso!";
-
-    setTimeout(() => {
-      window.location.href = "/templates/index.html";
-    }, 1000);
+    
+    // Função para mostrar mensagem
+    function mostrarMensagem(texto, tipo) {
+      mensagemDiv.textContent = texto;
+      mensagemDiv.className = tipo === 'success' ? 'success-message' : 'error-message';
+      mensagemDiv.style.display = 'block';
+    }
+    
+    // Função para mostrar/ocultar loading
+    function setLoading(loading) {
+      if (loading) {
+        btnText.style.display = 'none';
+        btnLoading.style.display = 'inline';
+        submitBtn.disabled = true;
+        emailInput.disabled = true;
+        passwordInput.disabled = true;
+      } else {
+        btnText.style.display = 'inline';
+        btnLoading.style.display = 'none';
+        submitBtn.disabled = false;
+        emailInput.disabled = false;
+        passwordInput.disabled = false;
+      }
+    }
+    
+    // Evento de submit do formulário
+    loginForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      
+      const email = emailInput.value.trim();
+      const senha = passwordInput.value.trim();
+      
+      // Validações
+      if (!email) {
+        mostrarMensagem("Por favor, informe seu e-mail", "error");
+        emailInput.focus();
+        return;
+      }
+      
+      if (!senha) {
+        mostrarMensagem("Por favor, informe sua senha", "error");
+        passwordInput.focus();
+        return;
+      }
+      
+      // Validação básica de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        mostrarMensagem("Por favor, informe um e-mail válido", "error");
+        emailInput.focus();
+        return;
+      }
+      
+      // Verificar se a função de login está disponível
+      if (typeof loginFirebaseFrontend !== 'function') {
+        mostrarMensagem("Erro no sistema. Recarregue a página.", "error");
+        console.error("loginFirebaseFrontend não está disponível");
+        return;
+      }
+      
+      // Iniciar loading
+      setLoading(true);
+      mensagemDiv.style.display = 'none';
+      
+      try {
+        // Fazer login
+        const resultado = await loginFirebaseFrontend(email, senha);
+        
+        if (!resultado.success) {
+          mostrarMensagem(resultado.error, "error");
+          setLoading(false);
+          
+          // Limpar senha em caso de erro
+          passwordInput.value = "";
+          passwordInput.focus();
+          
+          return;
+        }
+        
+        // Login bem-sucedido
+        mostrarMensagem("✓ Login realizado com sucesso! Redirecionando...", "success");
+        
+        // Aguardar 1.5 segundos antes de redirecionar
+        setTimeout(() => {
+          window.location.href = "/templates/index.html";
+        }, 1500);
+        
+      } catch (error) {
+        console.error("Erro inesperado:", error);
+        mostrarMensagem("Erro inesperado. Tente novamente.", "error");
+        setLoading(false);
+      }
+    });
+    
+    // Focar no campo de email ao carregar
+    emailInput.focus();
+    
+    // Permitir submit com Enter (já está coberto pelo form, mas é bom ter)
+    emailInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && this.value.trim()) {
+        passwordInput.focus();
+      }
+    });
+    
+    passwordInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && this.value.trim()) {
+        loginForm.dispatchEvent(new Event('submit'));
+      }
+    });
   });
 </script>
 
