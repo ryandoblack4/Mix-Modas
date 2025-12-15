@@ -75,6 +75,22 @@ const listaDesejosRef = firestore ? firestore.collection("lista_desejos") : null
 
 // ================== API ==================
 
+// No seu server.js, adicione esta rota:
+app.get('/api/firebase-config', (req, res) => {
+  // Lê as variáveis de ambiente do Render
+  const config = {
+    apiKey: process.env.FIREBASE_API_KEY || '',
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
+    projectId: process.env.FIREBASE_PROJECT_ID || '',
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.FIREBASE_APP_ID || ''
+  };
+  
+  res.json(config);
+});
+
+
 // STATUS
 app.get("/api/status", (req, res) => {
   res.json({
@@ -83,6 +99,8 @@ app.get("/api/status", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+
 
 // ================== CADASTRO ==================
 app.post("/api/cadastro", async (req, res) => {

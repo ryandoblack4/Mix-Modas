@@ -74,36 +74,73 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
-<!-- Código DIRETO sem arquivos externos -->
+<!-- CÓDIGO SIMPLES E FUNCIONAL -->
 <script>
-  console.log("🚀 Sistema de Login - Iniciando...");
+  console.log("🔐 Login Mix-Modas - Iniciando sistema seguro...");
   
   let firebaseApp = null;
   
   /**
-   * Inicialização DIRETA
+   * BUSCA CONFIGURAÇÃO DO SEU BACKEND
+   * Seu server.js já tem a rota /api/firebase-config
    */
-  function initializeFirebase() {
+  async function getFirebaseConfig() {
+    try {
+      console.log("📡 Buscando configuração do backend...");
+      const response = await fetch('/api/firebase-config');
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+      
+      const config = await response.json();
+      
+      // Verifica se recebeu chaves válidas
+      if (!config.apiKey || config.apiKey === '') {
+        throw new Error("Chaves do Firebase não configuradas no Render");
+      }
+      
+      console.log("✅ Configuração obtida do backend");
+      return config;
+      
+    } catch (error) {
+      console.error("❌ ERRO AO BUSCAR CONFIGURAÇÃO:", error.message);
+      
+      // Mostra erro para o usuário
+      document.getElementById('mensagem').textContent = 
+        "⚠️ Sistema temporariamente indisponível. Tente novamente mais tarde.";
+      document.getElementById('mensagem').className = "error-message";
+      
+      throw error; // Propaga o erro
+    }
+  }
+  
+  /**
+   * INICIALIZA FIREBASE COM CONFIGURAÇÃO SEGURA
+   */
+  async function initializeFirebase() {
     if (firebaseApp) {
       console.log("✅ Firebase já inicializado");
       return firebaseApp;
     }
     
     try {
-      console.log("🔄 Inicializando Firebase...");
+      console.log("🔄 Inicializando Firebase de forma segura...");
       
+      // Verifica se Firebase SDK foi carregado
       if (typeof firebase === 'undefined') {
         throw new Error("Firebase SDK não carregado");
       }
       
-      // CONFIGURAÇÃO DIRETA (PARA DESENVOLVIMENTO/APENAS TESTE)
-      
+      // 🔥 AQUI ESTÁ O CORRETO: Busca do backend
+      const firebaseConfig = await getFirebaseConfig();
       
       console.log("📋 Usando projeto:", firebaseConfig.projectId);
       
+      // Inicializa Firebase
       if (!firebase.apps.length) {
         firebaseApp = firebase.initializeApp(firebaseConfig);
-        console.log("✅ Firebase inicializado com sucesso!");
+        console.log("🎉 Firebase inicializado com sucesso!");
       } else {
         firebaseApp = firebase.apps[0];
         console.log("✅ Firebase já estava inicializado");
@@ -112,20 +149,20 @@
       return firebaseApp;
       
     } catch (error) {
-      console.error("❌ Erro ao inicializar Firebase:", error);
+      console.error("💥 FALHA NA INICIALIZAÇÃO:", error.message);
       throw error;
     }
   }
   
   /**
-   * Função de login
+   * FUNÇÃO DE LOGIN (simplificada)
    */
   async function loginFirebaseFrontend(email, senha) {
     console.log("🔐 Tentando login para:", email);
     
     try {
-      // Inicializa Firebase
-      const app = initializeFirebase();
+      // Inicializa Firebase (se ainda não estiver)
+      const app = await initializeFirebase();
       if (!app) {
         return {
           success: false,
@@ -133,13 +170,15 @@
         };
       }
       
+      // Verifica se auth está disponível
       if (typeof firebase.auth !== 'function') {
         return {
           success: false,
-          error: "Módulo de autenticação não carregado"
+          error: "Módulo de autenticação não disponível"
         };
       }
       
+      // Faz login
       const userCredential = await firebase.auth().signInWithEmailAndPassword(email, senha);
       const user = userCredential.user;
       
@@ -148,16 +187,8 @@
       localStorage.setItem('userEmail', user.email);
       localStorage.setItem('userUID', user.uid);
       localStorage.setItem('userName', user.displayName || email.split('@')[0]);
-      localStorage.setItem('loginTime', Date.now().toString());
       
-      console.log("✅ Login bem-sucedido! Dados salvos:", {
-        email: user.email,
-        uid: user.uid,
-        localStorage: {
-          usuarioLogado: localStorage.getItem('usuarioLogado'),
-          userEmail: localStorage.getItem('userEmail')
-        }
-      });
+      console.log("✅ Login bem-sucedido!");
       
       return {
         success: true,
@@ -168,7 +199,7 @@
       };
       
     } catch (error) {
-      console.error("❌ Erro no login:", error.code, error.message);
+      console.error("❌ Erro no login:", error.code);
       
       let mensagem = "Email ou senha incorretos";
       if (error.code === 'auth/invalid-email') mensagem = "Email inválido";
@@ -188,51 +219,15 @@
    */
   function verificarUsuarioLogado() {
     const logado = localStorage.getItem('usuarioLogado') === 'true';
-    const email = localStorage.getItem('userEmail');
-    const loginTime = localStorage.getItem('loginTime');
-    
-    // Verifica se não expirou (24 horas)
-    if (loginTime) {
-      const horas = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60);
-      if (horas > 24) {
-        console.log("⚠️ Login expirado (mais de 24 horas)");
-        localStorage.removeItem('usuarioLogado');
-        return false;
-      }
-    }
-    
-    console.log("🔍 Verificação de login:", {
-      logado: logado,
-      email: email,
-      temDados: !!(email && logado)
-    });
-    
-    return logado && email;
+    return logado;
   }
   
-  /**
-   * Logout
-   */
-  function logoutFirebase() {
-    console.log("🚪 Fazendo logout...");
-    
-    const keys = ['usuarioLogado', 'userEmail', 'userUID', 'userName', 'loginTime'];
-    keys.forEach(key => localStorage.removeItem(key));
-    
-    if (firebaseApp && typeof firebase.auth === 'function') {
-      firebase.auth().signOut();
-    }
-    
-    window.location.href = '/templates/index.html';
-  }
-  
-  // Exporta funções
+  // Torna funções disponíveis globalmente
   window.loginFirebaseFrontend = loginFirebaseFrontend;
   window.verificarUsuarioLogado = verificarUsuarioLogado;
-  window.logoutFirebase = logoutFirebase;
   window.initializeFirebase = initializeFirebase;
   
-  console.log("✅ Sistema de login carregado e pronto");
+  console.log("✅ Sistema de login carregado");
 </script>
 
 <!-- Lógica da página -->
@@ -252,14 +247,11 @@
       mensagemDiv.className = tipo === 'success' ? 'success-message' : 'error-message';
     }
     
-    // Inicializa Firebase imediatamente
-    try {
-      initializeFirebase();
-      console.log("🎉 Firebase pronto para uso");
-    } catch (error) {
-      console.error("Erro no Firebase:", error);
-      mostrarMensagem("⚠️ Sistema temporariamente indisponível", "error");
-    }
+    // Tenta inicializar Firebase quando a página carrega
+    // Mas não bloqueia se falhar (deixa tentar no submit)
+    initializeFirebase().catch(error => {
+      console.log("Firebase não inicializado ainda, mas pode tentar login");
+    });
     
     // Evento de submit
     loginForm.addEventListener("submit", async function(e) {
@@ -268,11 +260,13 @@
       const email = emailInput.value.trim();
       const senha = passwordInput.value.trim();
       
+      // Validações básicas
       if (!email || !senha) {
         mostrarMensagem("Preencha e-mail e senha", "error");
         return;
       }
       
+      // Desabilita botão
       submitBtn.disabled = true;
       submitBtn.textContent = "Processando...";
       mensagemDiv.textContent = "";
@@ -293,11 +287,11 @@
         // SUCESSO
         mostrarMensagem("✓ Login realizado! Redirecionando...", "success");
         
-        // Aguarda 2 segundos e redireciona
+        // Aguarda 1.5 segundos e redireciona
         setTimeout(() => {
           console.log("➡️ Indo para index.html...");
           window.location.href = "/templates/index.html";
-        }, 2000);
+        }, 1500);
         
       } catch (error) {
         console.error("Erro inesperado:", error);
