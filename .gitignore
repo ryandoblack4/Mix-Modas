@@ -16,6 +16,7 @@ config.js
 keys.js
 secrets/
 config/    
+firebase-config.local.js
 
 # Logs
 logs/
