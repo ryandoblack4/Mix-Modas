@@ -32,6 +32,7 @@
       margin-top: 15px;
       font-size: 14px;
       border-left: 4px solid #e74c3c;
+      display: none;
     }
     .success-message {
       color: #27ae60;
@@ -41,6 +42,7 @@
       margin-top: 15px;
       font-size: 14px;
       border-left: 4px solid #27ae60;
+      display: none;
     }
     .links-container {
       margin-top: 20px;
@@ -54,6 +56,10 @@
     }
     .links-container a:hover {
       text-decoration: underline;
+    }
+    .login-button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -87,84 +93,121 @@
     <a href="/templates/index.html">← Voltar para a loja</a>
   </div>
 
-  <div id="mensagem"></div>
+  <div id="mensagem" class="error-message"></div>
 </form>
 
-<!-- SCRIPT DO FIREBASE (ORDEM IMPORTANTE) -->
+<!-- PRIMEIRO: Scripts de configuração -->
+<script>
+  // Configuração do Firebase para desenvolvimento
+  // EM PRODUÇÃO, USE VARIÁVEIS DE AMBIENTE OU BACKEND
+  window.firebaseConfig = {
+    apiKey: "AIzaSyBWpN_MWnNGB7ODj-JJ3gPVTXusD3_E9W8",
+    authDomain: "mixmodas-ecom.firebaseapp.com",
+    projectId: "mixmodas-ecom",
+    storageBucket: "mixmodas-ecom.firebasestorage.app",
+    messagingSenderId: "663940847047",
+    appId: "1:663940847047:web:e6d459f90a34ec51e517b4"
+  };
+  
+  console.log("⚙️ Configuração do Firebase definida");
+</script>
+
+<!-- SEGUNDO: Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+
+<!-- TERCEIRO: Seu script de autenticação -->
 <script src="/static/js/firebase-auth.js"></script>
 
+<!-- QUARTO: Lógica da página -->
 <script>
-  // Aguardar o DOM estar pronto
+  // Funções auxiliares da página
+  function mostrarMensagem(texto, tipo) {
+    const mensagemDiv = document.getElementById("mensagem");
+    mensagemDiv.textContent = texto;
+    mensagemDiv.className = tipo === 'success' ? 'success-message' : 'error-message';
+    mensagemDiv.style.display = 'block';
+  }
+  
+  function setLoading(loading) {
+    const btnText = document.getElementById("btnText");
+    const btnLoading = document.getElementById("btnLoading");
+    const submitBtn = document.getElementById("submitBtn");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    
+    if (loading) {
+      btnText.style.display = 'none';
+      btnLoading.style.display = 'inline';
+      submitBtn.disabled = true;
+      emailInput.disabled = true;
+      passwordInput.disabled = true;
+    } else {
+      btnText.style.display = 'inline';
+      btnLoading.style.display = 'none';
+      submitBtn.disabled = false;
+      emailInput.disabled = false;
+      passwordInput.disabled = false;
+    }
+  }
+  
+  // Quando a página carregar
   document.addEventListener('DOMContentLoaded', function() {
+    console.log("📄 Página de login carregada");
+    
     const loginForm = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
-    const mensagemDiv = document.getElementById("mensagem");
-    const submitBtn = document.getElementById("submitBtn");
-    const btnText = document.getElementById("btnText");
-    const btnLoading = document.getElementById("btnLoading");
+    
+    // DEBUG: Verificar se tudo está carregado
+    console.log("Firebase SDK:", typeof firebase);
+    console.log("Firebase Auth:", typeof firebase?.auth);
+    console.log("loginFirebaseFrontend:", typeof loginFirebaseFrontend);
+    console.log("initializeFirebase:", typeof initializeFirebase);
     
     // Verificar se já está logado
-    if (typeof verificarUsuarioLogado === 'function' && verificarUsuarioLogado()) {
-      mensagemDiv.textContent = "Você já está logado! Redirecionando...";
-      mensagemDiv.className = "success-message";
-      
-      setTimeout(() => {
-        window.location.href = "/templates/index.html";
-      }, 1500);
-      return;
+    if (typeof verificarUsuarioLogado === 'function') {
+      if (verificarUsuarioLogado()) {
+        mostrarMensagem("Você já está logado! Redirecionando...", "success");
+        setTimeout(() => {
+          window.location.href = "/templates/index.html";
+        }, 1500);
+        return;
+      }
     }
     
-    // Verificar estado do Firebase (debug)
-    console.log("Estado Firebase:", typeof verificarEstadoFirebase === 'function' 
-      ? verificarEstadoFirebase() 
-      : "Função não disponível");
-    
-    // Inicializar Firebase ao carregar a página
+    // Inicializar Firebase imediatamente
     if (typeof initializeFirebase === 'function') {
+      console.log("🔄 Inicializando Firebase...");
       initializeFirebase().then(app => {
         if (app) {
-          console.log("✅ Firebase pronto para uso");
+          console.log("✅ Firebase inicializado com sucesso!");
+          mostrarMensagem("Sistema pronto para login", "success");
+          setTimeout(() => {
+            document.getElementById("mensagem").style.display = 'none';
+          }, 2000);
+        } else {
+          console.error("❌ Firebase não foi inicializado");
+          mostrarMensagem("Sistema de autenticação temporariamente indisponível", "error");
         }
       }).catch(error => {
         console.error("❌ Erro ao inicializar Firebase:", error);
+        mostrarMensagem("Erro ao inicializar sistema. Recarregue a página.", "error");
       });
-    }
-    
-    // Função para mostrar mensagem
-    function mostrarMensagem(texto, tipo) {
-      mensagemDiv.textContent = texto;
-      mensagemDiv.className = tipo === 'success' ? 'success-message' : 'error-message';
-      mensagemDiv.style.display = 'block';
-    }
-    
-    // Função para mostrar/ocultar loading
-    function setLoading(loading) {
-      if (loading) {
-        btnText.style.display = 'none';
-        btnLoading.style.display = 'inline';
-        submitBtn.disabled = true;
-        emailInput.disabled = true;
-        passwordInput.disabled = true;
-      } else {
-        btnText.style.display = 'inline';
-        btnLoading.style.display = 'none';
-        submitBtn.disabled = false;
-        emailInput.disabled = false;
-        passwordInput.disabled = false;
-      }
+    } else {
+      console.error("❌ initializeFirebase não encontrado!");
+      mostrarMensagem("Erro no carregamento do sistema. Recarregue a página.", "error");
     }
     
     // Evento de submit do formulário
     loginForm.addEventListener("submit", async function(e) {
       e.preventDefault();
+      e.stopPropagation();
       
       const email = emailInput.value.trim();
       const senha = passwordInput.value.trim();
       
-      // Validações
+      // Validações básicas
       if (!email) {
         mostrarMensagem("Por favor, informe seu e-mail", "error");
         emailInput.focus();
@@ -177,7 +220,7 @@
         return;
       }
       
-      // Validação básica de email
+      // Validação de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         mostrarMensagem("Por favor, informe um e-mail válido", "error");
@@ -185,26 +228,26 @@
         return;
       }
       
-      // Verificar se a função de login está disponível
+      // Verificar se a função de login existe
       if (typeof loginFirebaseFrontend !== 'function') {
-        mostrarMensagem("Erro no sistema. Recarregue a página.", "error");
-        console.error("loginFirebaseFrontend não está disponível");
+        mostrarMensagem("Erro: Sistema de login não carregado. Recarregue a página.", "error");
+        console.error("loginFirebaseFrontend não é uma função");
         return;
       }
       
       // Iniciar loading
       setLoading(true);
-      mensagemDiv.style.display = 'none';
       
       try {
-        // Fazer login
+        console.log("🔄 Tentando login para:", email);
         const resultado = await loginFirebaseFrontend(email, senha);
+        console.log("Resultado:", resultado);
         
         if (!resultado.success) {
           mostrarMensagem(resultado.error, "error");
           setLoading(false);
           
-          // Limpar senha em caso de erro
+          // Limpar senha e focar nela
           passwordInput.value = "";
           passwordInput.focus();
           
@@ -214,22 +257,22 @@
         // Login bem-sucedido
         mostrarMensagem("✓ Login realizado com sucesso! Redirecionando...", "success");
         
-        // Aguardar 1.5 segundos antes de redirecionar
+        // Aguardar e redirecionar
         setTimeout(() => {
           window.location.href = "/templates/index.html";
         }, 1500);
         
       } catch (error) {
-        console.error("Erro inesperado:", error);
+        console.error("Erro inesperado no login:", error);
         mostrarMensagem("Erro inesperado. Tente novamente.", "error");
         setLoading(false);
       }
     });
     
-    // Focar no campo de email ao carregar
+    // Focar no campo de email
     emailInput.focus();
     
-    // Permitir submit com Enter (já está coberto pelo form, mas é bom ter)
+    // Navegação com teclado
     emailInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter' && this.value.trim()) {
         passwordInput.focus();
@@ -238,6 +281,7 @@
     
     passwordInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter' && this.value.trim()) {
+        e.preventDefault();
         loginForm.dispatchEvent(new Event('submit'));
       }
     });

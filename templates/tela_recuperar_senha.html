@@ -1,0 +1,144 @@
+<!-- /templates/tela_recuperar_senha.html -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperar Senha - Mix-Modas</title>
+  <link rel="stylesheet" href="/static/css/style_login.css">
+  
+  <style>
+    .logo-section {
+      background: #000;
+      padding: 30px 20px;
+      text-align: center;
+      margin: -3rem -3rem 2rem -3rem;
+      border-radius: 10px 10px 0 0;
+    }
+    .logo-img {
+      max-width: 180px;
+      height: auto;
+    }
+    .info-text {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<form id="recoveryForm">
+  <div class="logo-section">
+    <img src="/static/css/logo-mixmodas.png" alt="Mix-Modas" class="logo-img">
+  </div>
+
+  <h1>Recuperar Senha</h1>
+  
+  <p class="info-text">
+    Digite seu e-mail cadastrado. Enviaremos um link para redefinir sua senha.
+  </p>
+
+  <div>
+    <label for="email">E-mail</label>
+    <input type="email" id="email" placeholder="seu@email.com" required autocomplete="email">
+  </div>
+
+  <button type="submit" class="login-button" id="submitBtn">
+    <span id="btnText">Enviar link de recuperação</span>
+    <span id="btnLoading" style="display: none;">Enviando...</span>
+  </button>
+  
+  <div class="links-container">
+    <a href="/templates/tela_login.html">← Voltar para o login</a><br>
+    <a href="/templates/tela_cadastro.html">Criar nova conta</a><br>
+    <a href="/templates/index.html">Voltar para a loja</a>
+  </div>
+
+  <div id="mensagem"></div>
+</form>
+
+<!-- SCRIPT DO FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="/static/js/firebase-auth.js"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const recoveryForm = document.getElementById("recoveryForm");
+    const emailInput = document.getElementById("email");
+    const mensagemDiv = document.getElementById("mensagem");
+    const submitBtn = document.getElementById("submitBtn");
+    const btnText = document.getElementById("btnText");
+    const btnLoading = document.getElementById("btnLoading");
+    
+    // Função para mostrar mensagem
+    function mostrarMensagem(texto, tipo) {
+      mensagemDiv.textContent = texto;
+      mensagemDiv.className = tipo === 'success' ? 'success-message' : 'error-message';
+      mensagemDiv.style.display = 'block';
+    }
+    
+    // Função para mostrar/ocultar loading
+    function setLoading(loading) {
+      if (loading) {
+        btnText.style.display = 'none';
+        btnLoading.style.display = 'inline';
+        submitBtn.disabled = true;
+        emailInput.disabled = true;
+      } else {
+        btnText.style.display = 'inline';
+        btnLoading.style.display = 'none';
+        submitBtn.disabled = false;
+        emailInput.disabled = false;
+      }
+    }
+    
+    // Evento de submit
+    recoveryForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      
+      const email = emailInput.value.trim();
+      
+      if (!email) {
+        mostrarMensagem("Por favor, informe seu e-mail", "error");
+        emailInput.focus();
+        return;
+      }
+      
+      // Verificar se a função está disponível
+      if (typeof redefinirSenha !== 'function') {
+        mostrarMensagem("Sistema temporariamente indisponível", "error");
+        return;
+      }
+      
+      setLoading(true);
+      mensagemDiv.style.display = 'none';
+      
+      try {
+        const resultado = await redefinirSenha(email);
+        
+        if (!resultado.success) {
+          mostrarMensagem(resultado.error, "error");
+          setLoading(false);
+          return;
+        }
+        
+        mostrarMensagem("✓ " + resultado.message + " Verifique sua caixa de entrada.", "success");
+        emailInput.value = "";
+        setLoading(false);
+        
+      } catch (error) {
+        mostrarMensagem("Erro inesperado. Tente novamente.", "error");
+        setLoading(false);
+      }
+    });
+    
+    // Focar no campo de email
+    emailInput.focus();
+  });
+</script>
+
+</body>
+</html>
