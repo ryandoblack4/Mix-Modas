@@ -37,7 +37,7 @@
       border-left: 4px solid #27ae60;
     }
     .login-button:disabled {
-      opacity: 0.7;
+      opacity: 0.6;
       cursor: not-allowed;
     }
   </style>
@@ -74,60 +74,130 @@
   <div id="mensagem"></div>
 </form>
 
-<!-- 1. FIREBASE SDK -->
+<!-- 1. Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
-<!-- 2. CONFIGURAÇÃO DIRETA NO HTML -->
+<!-- 2. Código principal (VAI PRO GIT) -->
 <script>
-  // CONFIGURAÇÃO DO SEU FIREBASE - USE SUAS CHAVES REAIS
-  const firebaseConfig = {
-    apiKey: "AIzaSyBWpN_MWnNGB7ODj-JJ3gPVTXusD3_E9W8",
-    authDomain: "mixmodas-ecom.firebaseapp.com",
-    projectId: "mixmodas-ecom",
-    storageBucket: "mixmodas-ecom.firebasestorage.app",
-    messagingSenderId: "663940847047",
-    appId: "1:663940847047:web:e6d459f90a34ec51e517b4"
-  };
+  console.log("🚀 Sistema de Login - Iniciando...");
   
-  // INICIALIZAÇÃO DIRETA E SIMPLES DO FIREBASE
   let firebaseApp = null;
-  try {
-    if (firebase && !firebase.apps.length) {
-      firebaseApp = firebase.initializeApp(firebaseConfig);
-      console.log("✅ Firebase inicializado COM SUCESSO!");
-    } else if (firebase && firebase.apps.length) {
-      firebaseApp = firebase.apps[0];
-      console.log("✅ Firebase já estava inicializado");
+  let firebaseInitialized = false;
+  
+  /**
+   * Busca configuração do Firebase
+   */
+  async function getFirebaseConfig() {
+    console.log("🔍 Buscando configuração do Firebase...");
+    
+    // Tenta carregar do arquivo local (não commitado)
+    try {
+      // Tenta importar dinamicamente
+      const configModule = await import('/static/js/firebase-config.local.js');
+      if (configModule.firebaseConfig) {
+        console.log("✅ Configuração carregada do arquivo local");
+        return configModule.firebaseConfig;
+      }
+    } catch (error) {
+      console.log("ℹ️ Arquivo de configuração local não encontrado");
     }
-  } catch (error) {
-    console.error("❌ Erro ao inicializar Firebase:", error);
+    
+    // Fallback para desenvolvimento
+    if (window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1') {
+      console.warn("⚠️ Modo desenvolvimento: usando placeholder");
+      return {
+        apiKey: "CONFIGURE-SUAS-CHAVES-LOCALMENTE",
+        authDomain: "seu-projeto.firebaseapp.com",
+        projectId: "seu-projeto-id",
+        storageBucket: "seu-projeto.appspot.com",
+        messagingSenderId: "1234567890",
+        appId: "1:1234567890:web:abc123def456",
+        databaseURL: "https://seu-projeto.firebaseio.com"
+      };
+    }
+    
+    throw new Error("Configuração do Firebase não encontrada");
   }
-</script>
-
-<!-- 3. SEU SCRIPT DE AUTENTICAÇÃO (versão ultra simplificada) -->
-<script>
-  // FUNÇÕES DE AUTENTICAÇÃO DIRETAS
+  
+  /**
+   * Inicializa Firebase
+   */
+  async function initializeFirebase() {
+    if (firebaseInitialized) {
+      console.log("✅ Firebase já inicializado");
+      return firebaseApp;
+    }
+    
+    try {
+      console.log("🔄 Inicializando Firebase...");
+      
+      if (typeof firebase === 'undefined') {
+        throw new Error("Firebase SDK não carregado");
+      }
+      
+      const config = await getFirebaseConfig();
+      
+      // Verifica se é placeholder
+      if (config.apiKey === "CONFIGURE-SUAS-CHAVES-LOCALMENTE") {
+        console.error("❌ Configure suas chaves do Firebase!");
+        console.log("Crie o arquivo /static/js/firebase-config.local.js");
+        throw new Error("Chaves do Firebase não configuradas");
+      }
+      
+      if (!firebase.apps.length) {
+        firebaseApp = firebase.initializeApp(config);
+        console.log("✅ Firebase inicializado com sucesso!");
+      } else {
+        firebaseApp = firebase.apps[0];
+        console.log("✅ Firebase já estava inicializado");
+      }
+      
+      firebaseInitialized = true;
+      return firebaseApp;
+      
+    } catch (error) {
+      console.error("❌ Erro ao inicializar Firebase:", error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * Função de login
+   */
   async function loginFirebaseFrontend(email, senha) {
     console.log("🔐 Tentando login para:", email);
     
     try {
-      // Verifica se Firebase está disponível
-      if (!firebase || typeof firebase.auth !== 'function') {
-        throw new Error("Firebase não disponível");
+      // Inicializa Firebase se necessário
+      if (!firebaseInitialized) {
+        const app = await initializeFirebase();
+        if (!app) {
+          return {
+            success: false,
+            error: "Sistema de autenticação indisponível"
+          };
+        }
       }
       
-      // Faz login DIRETO
+      if (typeof firebase.auth !== 'function') {
+        return {
+          success: false,
+          error: "Módulo de autenticação não carregado"
+        };
+      }
+      
       const userCredential = await firebase.auth().signInWithEmailAndPassword(email, senha);
       const user = userCredential.user;
       
-      // Salva no localStorage - ESSENCIAL!
+      // Salva no localStorage
       localStorage.setItem('usuarioLogado', 'true');
       localStorage.setItem('userEmail', user.email);
       localStorage.setItem('userUID', user.uid);
       localStorage.setItem('userName', user.displayName || email.split('@')[0]);
       
-      console.log("✅ LOGIN BEM-SUCEDIDO! Dados salvos:", {
+      console.log("✅ Login bem-sucedido! Dados salvos:", {
         email: user.email,
         uid: user.uid
       });
@@ -141,13 +211,12 @@
       };
       
     } catch (error) {
-      console.error("❌ ERRO NO LOGIN:", error.code, error.message);
+      console.error("❌ Erro no login:", error.code);
       
       let mensagem = "Email ou senha incorretos";
       if (error.code === 'auth/invalid-email') mensagem = "Email inválido";
       if (error.code === 'auth/user-not-found') mensagem = "Usuário não encontrado";
       if (error.code === 'auth/wrong-password') mensagem = "Senha incorreta";
-      if (error.code === 'auth/too-many-requests') mensagem = "Muitas tentativas. Tente mais tarde.";
       
       return {
         success: false,
@@ -156,32 +225,39 @@
     }
   }
   
+  /**
+   * Verifica se usuário está logado
+   */
   function verificarUsuarioLogado() {
     const logado = localStorage.getItem('usuarioLogado') === 'true';
-    console.log("🔍 Verificando login:", logado, "Email:", localStorage.getItem('userEmail'));
+    console.log("🔍 Verificação de login:", logado);
     return logado;
   }
   
+  /**
+   * Logout
+   */
   function logoutFirebase() {
     localStorage.clear();
-    if (firebase && typeof firebase.auth === 'function') {
+    if (firebaseApp && typeof firebase.auth === 'function') {
       firebase.auth().signOut();
     }
     window.location.href = '/templates/index.html';
   }
   
-  // Torna as funções disponíveis globalmente
+  // Exporta funções
   window.loginFirebaseFrontend = loginFirebaseFrontend;
   window.verificarUsuarioLogado = verificarUsuarioLogado;
   window.logoutFirebase = logoutFirebase;
+  window.initializeFirebase = initializeFirebase;
   
-  console.log("🎯 Sistema de login PRONTO!");
+  console.log("✅ Sistema de login carregado");
 </script>
 
-<!-- 4. LÓGICA DA PÁGINA DE LOGIN -->
+<!-- 3. Lógica da página -->
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 Página de login carregada");
+    console.log("📄 Página carregada");
     
     const loginForm = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
@@ -199,6 +275,13 @@
       return;
     }
     
+    // Inicializa Firebase
+    initializeFirebase().catch(error => {
+      console.error("Erro na inicialização:", error);
+      mensagemDiv.textContent = "⚠️ Sistema em manutenção. Tente mais tarde.";
+      mensagemDiv.className = "error-message";
+    });
+    
     // Função para mostrar mensagem
     function mostrarMensagem(texto, tipo) {
       mensagemDiv.textContent = texto;
@@ -212,19 +295,16 @@
       const email = emailInput.value.trim();
       const senha = passwordInput.value.trim();
       
-      // Validações básicas
       if (!email || !senha) {
-        mostrarMensagem("Preencha e-mail e senha.", "error");
+        mostrarMensagem("Preencha e-mail e senha", "error");
         return;
       }
       
-      // Desabilita botão
       submitBtn.disabled = true;
       submitBtn.textContent = "Processando...";
       mensagemDiv.textContent = "";
       
       try {
-        console.log("🔄 Processando login...");
         const resultado = await loginFirebaseFrontend(email, senha);
         
         if (!resultado.success) {
@@ -232,41 +312,24 @@
           submitBtn.disabled = false;
           submitBtn.textContent = "Entrar";
           passwordInput.value = "";
-          passwordInput.focus();
           return;
         }
         
-        // SUCESSO!
         mostrarMensagem("✓ Login realizado! Redirecionando...", "success");
         
-        // Aguarda 1.5 segundos e redireciona
         setTimeout(() => {
           window.location.href = "/templates/index.html";
         }, 1500);
         
       } catch (error) {
-        console.error("Erro inesperado:", error);
-        mostrarMensagem("Erro inesperado. Tente novamente.", "error");
+        console.error("Erro:", error);
+        mostrarMensagem("Erro inesperado", "error");
         submitBtn.disabled = false;
         submitBtn.textContent = "Entrar";
       }
     });
     
-    // Foca no email
     emailInput.focus();
-    
-    // Enter para navegar
-    emailInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        passwordInput.focus();
-      }
-    });
-    
-    passwordInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        loginForm.dispatchEvent(new Event('submit'));
-      }
-    });
   });
 </script>
 
